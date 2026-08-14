@@ -162,6 +162,17 @@ function createParkAudio(player) {
     tone(base * 1.414, now + 0.12, 2.8, 0.022, "triangle", effectsBus);
   }
 
+  function playAlarm() {
+    unlock();
+    if (!ctx || muted) return;
+    const start = ctx.currentTime + 0.03;
+    for (let i = 0; i < 14; i++) {
+      const at = start + i * 0.42;
+      tone(i % 2 ? 390 : 285, at, 0.34, 0.12, "sawtooth", effectsBus);
+      tone(i % 2 ? 195 : 142.5, at, 0.38, 0.055, "square", effectsBus);
+    }
+  }
+
   function update() {
     if (!ctx || muted || ctx.state !== "running") return;
     scheduleMusic();
@@ -208,5 +219,5 @@ function createParkAudio(player) {
     window.addEventListener("keydown", unlock, { passive: true });
   }
 
-  return { update, unlock, toggle, setMuted };
+  return { update, unlock, toggle, setMuted, playAlarm };
 }

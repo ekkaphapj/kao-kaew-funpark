@@ -25,6 +25,7 @@ function buildBuildings(scene) {
     root.position.set(cfg.x, 0, cfg.z);
     root.rotation.y = cfg.rotY || 0;
     const W = cfg.w, H = cfg.h, D = cfg.d, TH = 0.4;
+    PARK.indoorZones.push({ x: cfg.x, z: cfg.z, w: W - TH * 2, d: D - TH * 2, rotY: cfg.rotY || 0 });
     const dw = cfg.doorW || 2.6, dh = cfg.doorH || 3;
 
     const bodyM = mat(scene, "hbM_" + cfg.name, cfg.tint || C3(0.55, 0.5, 0.52), {
@@ -510,6 +511,7 @@ function buildBuildings(scene) {
   // =========================================================
   {
     const hx = -72, hz = -34;
+    PARK.indoorZones.push({ x: hx, z: hz, w: 25, d: 17, rotY: 0 });
     const hhMat = mat(scene, "hhMat", C3(0.42, 0.36, 0.5), { tex: TEX.brick(scene, "dark") });
     hhMat.diffuseTexture.uScale = 5; hhMat.diffuseTexture.vScale = 3;
     const inMat = mat(scene, "hhInMat", C3(0.2, 0.15, 0.26), { tex: TEX.brick(scene, "dark") });

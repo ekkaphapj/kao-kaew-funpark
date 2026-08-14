@@ -176,6 +176,7 @@ function createPlayer(scene, canvas) {
     runLatch: false,     // mobile run toggle
     moveX: 0, moveZ: 0,  // input axes (left stick / WASD)
     turn: 0,             // yaw input (right stick / arrow keys)
+    dead: false,
   };
 
   // ---------- collider (capsule) ----------
@@ -217,6 +218,25 @@ function createPlayer(scene, canvas) {
 
   function toggleView() {
     state.view = state.view === 1 ? 3 : 1;
+  }
+
+  function die() {
+    if (state.dead) return;
+    state.dead = true;
+    state.moveX = 0; state.moveZ = 0; state.turn = 0;
+    const death = document.getElementById("death-screen");
+    if (death) death.classList.add("show");
+    setTimeout(() => {
+      root.position.set(0, 0.95, -92);
+      state.yaw = Math.PI;
+      state.pitch = 0.05;
+      state.running = false;
+      state.runLatch = false;
+      const runBtn = document.getElementById("btn-run");
+      if (runBtn) runBtn.classList.remove("active");
+      state.dead = false;
+      if (death) death.classList.remove("show");
+    }, 2200);
   }
 
   // ---------- mouse (pointer lock) ----------
@@ -309,6 +329,7 @@ function createPlayer(scene, canvas) {
   const rayOrigin = new BABYLON.Vector3();
 
   function update(dt) {
+    if (state.dead) return;
     // turning: arrow keys on PC, right stick on mobile
     let turn = state.turn;
     if (Math.abs(turn) < 0.15) turn = 0; // stick deadzone
@@ -394,5 +415,5 @@ function createPlayer(scene, canvas) {
     }
   }
 
-  return { update, state, root, rig };
+  return { update, die, state, root, rig };
 }

@@ -10,6 +10,7 @@ const PARK = {
   flickers: [],   // { mat, base(Color3), speed, mode }
   updaters: [],   // fn(dt, t)
   colliders: [],  // meshes that block the third-person camera
+  indoorZones: [], // safe building interiors used by the monster system
   mats: {},
   bounds: 110,    // half size of the park (220x220 m)
   isMobile: false,
@@ -17,6 +18,18 @@ const PARK = {
   moonLight: null,
   shadowGenerator: null,
 };
+
+function isInsideParkBuilding(pos, padding) {
+  const pad = padding || 0;
+  for (const zone of PARK.indoorZones) {
+    const dx = pos.x - zone.x, dz = pos.z - zone.z;
+    const c = Math.cos(zone.rotY || 0), s = Math.sin(zone.rotY || 0);
+    const lx = dx * c - dz * s;
+    const lz = dx * s + dz * c;
+    if (Math.abs(lx) < zone.w / 2 - pad && Math.abs(lz) < zone.d / 2 - pad) return true;
+  }
+  return false;
+}
 
 function registerFlicker(mat, baseColor, mode) {
   PARK.flickers.push({

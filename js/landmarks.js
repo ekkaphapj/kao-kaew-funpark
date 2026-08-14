@@ -83,6 +83,7 @@ function buildLandmarks(scene) {
   // =========================================================
   {
     const cx = 0, cz = 85;
+    PARK.indoorZones.push({ x: cx, z: cz, w: 29, d: 15, rotY: 0 });
     const stoneMat = mat(scene, "castleStone", C3(0.34, 0.3, 0.42), { tex: TEX.brick(scene, "dark") });
     stoneMat.diffuseTexture.uScale = 8; stoneMat.diffuseTexture.vScale = 4;
     const inStone = mat(scene, "castleInStone", C3(0.3, 0.26, 0.38), { tex: TEX.brick(scene, "dark") });

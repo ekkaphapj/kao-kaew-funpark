@@ -29,6 +29,16 @@
   <div id="hint-mobile" class="hint" style="display:none">จอยซ้าย เดิน · จอยขวา หันซ้าย-ขวา</div>
 </div>
 
+<div id="monster-alert" role="alert">
+  <div class="alert-siren">⚠</div>
+  <div><strong>สัญญาณเตือนภัย</strong><span>นายตรวจตั๋วออกล่าแล้ว — หลบเข้าอาคาร!</span></div>
+</div>
+<div id="monster-status" aria-live="polite"></div>
+<div id="death-screen">
+  <div class="death-title">คุณถูกจับได้</div>
+  <div class="death-sub">กำลังกลับไปที่ทางเข้าสวนสนุก...</div>
+</div>
+
 <!-- Audio control -->
 <button id="btn-audio" type="button" aria-label="ปิดเสียง" aria-pressed="false" title="ปิดเสียง (M)">
   <span class="audio-icon" aria-hidden="true">🔊</span>
@@ -72,6 +82,7 @@
 <script src="js/rides.js"></script>
 <script src="js/landmarks.js"></script>
 <script src="js/player.js"></script>
+<script src="js/monster.js"></script>
 <script src="js/net.js"></script>
 <script src="js/audio.js"></script>
 <script src="js/main.js"></script>

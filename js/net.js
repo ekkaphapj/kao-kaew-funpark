@@ -7,7 +7,16 @@
 
 function initNet(scene, player, playerName) {
   const badge = document.getElementById("online");
-  const noNet = { update() {}, };
+  const noNet = {
+    update() {},
+    getMonsterContext() {
+      return {
+        isAuthority: true, hostId: "offline", remoteState: null,
+        players: [{ id: "offline", x: player.root.position.x, z: player.root.position.z, inside: isInsideParkBuilding(player.root.position), dead: player.state.dead }],
+        broadcast() {}, kill(id) { if (id === "offline") player.die(); },
+      };
+    },
+  };
 
   if (typeof supabase === "undefined") {
     if (badge) badge.textContent = "⚪ ออฟไลน์";
@@ -27,6 +36,7 @@ function initNet(scene, player, playerName) {
   }
 
   const myId = "p" + Math.random().toString(36).slice(2, 8);
+  const joinedAt = Date.now();
   const myName = (playerName || "").trim().slice(0, 12) || ("ผู้เล่น " + myId.slice(1, 5).toUpperCase());
   // 8 distinct shirt colors — first pick by id hash, conflicts resolved on sync
   const SHIRTS = ["#b32620", "#2076b3", "#2fa04a", "#b38a20", "#7a3fa0", "#20a08a", "#c05a20", "#b04a72"];
@@ -37,6 +47,15 @@ function initNet(scene, player, playerName) {
 
   const remotes = new Map(); // id -> {rig, tag, target, color, phase, lastX, lastZ}
   let connected = false;
+  let hostId = myId;
+  let monsterRemoteState = null;
+
+  function electHost() {
+    const candidates = [{ id: myId, joinedAt }];
+    for (const [id, r] of remotes) candidates.push({ id, joinedAt: r.joinedAt || joinedAt + 1 });
+    candidates.sort((a, b) => a.joinedAt - b.joinedAt || a.id.localeCompare(b.id));
+    hostId = candidates[0].id;
+  }
 
   function setBadge(n) {
     if (!badge) return;
@@ -84,8 +103,11 @@ function initNet(scene, player, playerName) {
     remotes.set(id, {
       rig, tag, color,
       target: { x: sx, z: sz, yaw: (meta && meta.yaw) || 0 },
+      inside: !!(meta && meta.inside), dead: !!(meta && meta.dead),
+      joinedAt: (meta && meta.joinedAt) || Date.now(),
       phase: 0, lastX: sx, lastZ: sz,
     });
+    electHost();
     setBadge(remotes.size + 1);
   }
 
@@ -96,6 +118,7 @@ function initNet(scene, player, playerName) {
     r.tag.dispose();
     r.rig.dispose();
     remotes.delete(id);
+    electHost();
     setBadge(remotes.size + 1);
   }
 
@@ -111,6 +134,8 @@ function initNet(scene, player, playerName) {
     channel.track({
       name: myName, color: myColor,
       x: +p.x.toFixed(1), z: +p.z.toFixed(1), yaw: +player.state.yaw.toFixed(2),
+      inside: isInsideParkBuilding(p), dead: player.state.dead,
+      joinedAt,
     });
   }
 
@@ -123,6 +148,7 @@ function initNet(scene, player, playerName) {
     for (const id of [...remotes.keys()]) {
       if (!ids.has(id)) removeRemote(id);
     }
+    electHost();
     // ---- unique shirt colors ----
     // if an earlier player (smaller id) already wears my color, I yield and
     // switch to the first free color, then re-announce myself
@@ -160,7 +186,18 @@ function initNet(scene, player, playerName) {
     const r = remotes.get(payload.id);
     if (r) {
       r.target.x = payload.x; r.target.z = payload.z; r.target.yaw = payload.yaw;
+      r.inside = !!payload.inside;
+      r.dead = !!payload.dead;
     }
+  });
+
+  channel.on("broadcast", { event: "monster-state" }, ({ payload }) => {
+    if (!payload || payload.hostId !== hostId || hostId === myId) return;
+    monsterRemoteState = payload;
+  });
+
+  channel.on("broadcast", { event: "monster-kill" }, ({ payload }) => {
+    if (payload && payload.victimId === myId) player.die();
   });
 
   channel.subscribe((status) => {
@@ -181,7 +218,7 @@ function initNet(scene, player, playerName) {
   // ---------- per-frame ----------
   let sendTimer = 0;
   let idleTimer = 0;
-  let lastSent = { x: 0, z: 0, yaw: 0 };
+  let lastSent = { x: 0, z: 0, yaw: 0, inside: false, dead: false };
 
   function update(dt) {
     // send my position ~10 Hz when it changed; keepalive every 2 s so late joiners sync
@@ -191,14 +228,16 @@ function initNet(scene, player, playerName) {
       sendTimer = 0.1;
       const p = player.root.position;
       const yaw = player.state.yaw;
+      const inside = isInsideParkBuilding(p);
+      const dead = player.state.dead;
       const changed = Math.abs(p.x - lastSent.x) > 0.02 || Math.abs(p.z - lastSent.z) > 0.02 ||
-        Math.abs(yaw - lastSent.yaw) > 0.01;
+        Math.abs(yaw - lastSent.yaw) > 0.01 || inside !== lastSent.inside || dead !== lastSent.dead;
       if (changed || idleTimer > 2) {
         idleTimer = 0;
-        lastSent = { x: p.x, z: p.z, yaw };
+        lastSent = { x: p.x, z: p.z, yaw, inside, dead };
         channel.send({
           type: "broadcast", event: "pos",
-          payload: { id: myId, x: +p.x.toFixed(2), z: +p.z.toFixed(2), yaw: +yaw.toFixed(3) },
+          payload: { id: myId, x: +p.x.toFixed(2), z: +p.z.toFixed(2), yaw: +yaw.toFixed(3), inside, dead },
         });
       }
     }
@@ -226,6 +265,27 @@ function initNet(scene, player, playerName) {
     }
   }
 
+  function getMonsterContext() {
+    const players = [{
+      id: myId, x: player.root.position.x, z: player.root.position.z,
+      inside: isInsideParkBuilding(player.root.position), dead: player.state.dead,
+    }];
+    for (const [id, r] of remotes) {
+      players.push({ id, x: r.target.x, z: r.target.z, inside: r.inside, dead: r.dead });
+    }
+    return {
+      isAuthority: !connected || hostId === myId,
+      hostId, players, remoteState: monsterRemoteState,
+      broadcast(state) {
+        if (connected) channel.send({ type: "broadcast", event: "monster-state", payload: state });
+      },
+      kill(victimId) {
+        if (victimId === myId) player.die();
+        else if (connected) channel.send({ type: "broadcast", event: "monster-kill", payload: { victimId, hostId } });
+      },
+    };
+  }
+
   setBadge(1);
-  return { update };
+  return { update, getMonsterContext };
 }

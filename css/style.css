@@ -83,6 +83,51 @@ html, body {
   text-shadow: 0 1px 3px #000;
 }
 
+/* ---------- Monster event HUD ---------- */
+#monster-alert {
+  position: fixed; left: 50%; top: 74px;
+  transform: translate(-50%, -18px);
+  z-index: 55; pointer-events: none;
+  display: flex; align-items: center; gap: 13px;
+  min-width: min(430px, 88vw); padding: 13px 20px;
+  border: 1px solid rgba(255, 65, 45, .75);
+  border-radius: 9px;
+  background: rgba(45, 4, 4, .9);
+  color: #ffe3d5;
+  box-shadow: 0 0 28px rgba(255, 25, 10, .35);
+  opacity: 0;
+  transition: opacity .25s ease, transform .25s ease;
+}
+#monster-alert.show { opacity: 1; transform: translate(-50%, 0); }
+#monster-alert strong, #monster-alert span { display: block; }
+#monster-alert strong { color: #ff765f; font-size: 18px; }
+#monster-alert span { margin-top: 2px; color: #f3b6a8; font-size: 13px; }
+.alert-siren { font-size: 30px; animation: alarmPulse .55s infinite alternate; }
+#monster-status {
+  position: fixed; top: 14px; left: 50%; transform: translateX(-50%);
+  z-index: 35; pointer-events: none;
+  display: none; padding: 7px 13px;
+  border-radius: 16px;
+  background: rgba(35, 4, 5, .76);
+  color: #ff9b87; font-size: 12px; font-weight: bold;
+  text-shadow: 0 1px 3px #000;
+}
+#monster-status.active { display: block; }
+#death-screen {
+  position: fixed; inset: 0; z-index: 120;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  pointer-events: none;
+  background: radial-gradient(circle, rgba(80, 0, 0, .45), rgba(0, 0, 0, .96));
+  opacity: 0; transition: opacity .18s ease;
+}
+#death-screen.show { opacity: 1; }
+.death-title { color: #d51f18; font-size: clamp(38px, 9vw, 76px); font-weight: bold; text-shadow: 0 0 25px #600; }
+.death-sub { margin-top: 10px; color: #cab6b0; font-size: 15px; }
+@keyframes alarmPulse { from { opacity: .45; transform: scale(.92); } to { opacity: 1; transform: scale(1.1); } }
+body.is-mobile #monster-alert { top: 102px; min-width: 78vw; padding: 10px 14px; }
+body.is-mobile #monster-alert strong { font-size: 15px; }
+body.is-mobile #monster-alert span { font-size: 11px; }
+
 /* ---------- Audio control ---------- */
 #btn-audio {
   position: fixed; left: 16px; bottom: max(16px, env(safe-area-inset-bottom));
