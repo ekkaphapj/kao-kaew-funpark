@@ -354,7 +354,8 @@ function buildLandmarks(scene) {
     flap.material = flapM;
     flap.freezeWorldMatrix();
     const tSign = BABYLON.MeshBuilder.CreatePlane("tentSign", { width: 8, height: 1.3 }, scene);
-    tSign.position.set(tx, 5.3, tz + R + 0.4);
+    // Keep the sign clearly in front of the wide roof edge so its lower half is not occluded.
+    tSign.position.set(tx, 6.25, tz + R + 1.65);
     tSign.rotation.y = Math.PI;
     const tTex = TEX.sign(scene, "ละครสัตว์มรณะ", { w: 1024, h: 160, bg: "#170808", fg: "#ff8a6a", glowColor: "#c03010", fontSize: 96 });
     const tSM = new BABYLON.StandardMaterial("tentSignM", scene);
@@ -364,6 +365,13 @@ function buildLandmarks(scene) {
     registerFlicker(tSM, C3(1, 1, 1), "buzz");
     tSign.material = tSM;
     tSign.freezeWorldMatrix();
+    const signPostM = mat(scene, "tentSignPostM", C3(0.18, 0.11, 0.08));
+    for (const sx of [-3.35, 3.35]) {
+      const post = BABYLON.MeshBuilder.CreateCylinder("tentSignPost", { height: 2.3, diameter: 0.13, tessellation: 6 }, scene);
+      post.position.set(tx + sx, 5.2, tz + R + 1.72);
+      post.material = signPostM;
+      post.freezeWorldMatrix();
+    }
     const tbMat = new BABYLON.StandardMaterial("tentBulbM", scene);
     tbMat.emissiveColor = C3(1, 0.7, 0.3);
     tbMat.diffuseColor = C3(0.15, 0.1, 0.03);

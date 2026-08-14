@@ -54,7 +54,7 @@ function createParkAudio(player) {
     master.connect(ctx.destination);
 
     musicBus = ctx.createGain();
-    musicBus.gain.value = 0.23;
+    musicBus.gain.value = 0.38;
     musicBus.connect(master);
     effectsBus = ctx.createGain();
     effectsBus.gain.value = 0.62;
@@ -68,7 +68,7 @@ function createParkAudio(player) {
     windFilter.frequency.value = 520;
     windFilter.Q.value = 0.5;
     const windGain = ctx.createGain();
-    windGain.gain.value = 0.34;
+    windGain.gain.value = 0.25;
     wind.connect(windFilter).connect(windGain).connect(musicBus);
     wind.start();
 

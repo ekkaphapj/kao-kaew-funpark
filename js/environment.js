@@ -362,6 +362,16 @@ function buildEnvironment(scene) {
     const a = (i / 8) * Math.PI * 2;
     lampSpots.push([Math.cos(a) * 19, -10 + Math.sin(a) * 19]);
   }
+  // Extra poles at formerly dark landmarks and service paths.
+  const dimLampDefs = [
+    [-27, -31, C3(1.0, 0.58, 0.25)],  // circus approach
+    [-63, -36, C3(0.72, 0.48, 0.32)], // haunted-house approach
+    [10, 42, C3(0.58, 0.64, 0.9)],    // north avenue
+    [49, 58, C3(0.55, 0.65, 0.82)],   // graveyard connector
+    [0, -124, C3(0.9, 0.55, 0.3)],    // parking lot
+  ];
+  const dimLampCount = PARK.lowQuality ? 2 : (PARK.isMobile ? 3 : dimLampDefs.length);
+  for (let i = 0; i < dimLampCount; i++) lampSpots.push([dimLampDefs[i][0], dimLampDefs[i][1]]);
   lampSpots.forEach((s, i) => {
     const li = lampBase.createInstance("lamp" + i);
     li.position.set(s[0], 2.75, s[1]);
@@ -391,6 +401,19 @@ function buildEnvironment(scene) {
   pointLight("plWater", new BABYLON.Vector3(65, 8, -75), C3(0.2, 0.8, 0.9), 1.7, 60);
   const redL = pointLight("plTower", new BABYLON.Vector3(95, 25, -10), C3(1, 0.15, 0.1), 1.2, 45);
   PARK.updaters.push((dt, t) => { redL.intensity = 0.8 + 0.5 * Math.sin(t * 2.2); });
+
+  // A few real, short-range lamp pools fill black spots without lighting every pole.
+  const dimLights = [];
+  for (let i = 0; i < dimLampCount; i++) {
+    const def = dimLampDefs[i];
+    const l = pointLight("plDimLamp" + i, new BABYLON.Vector3(def[0], 5.1, def[1]), def[2], 0.48, 19);
+    dimLights.push(l);
+  }
+  PARK.updaters.push((dt, t) => {
+    for (let i = 0; i < dimLights.length; i++) {
+      dimLights[i].intensity = 0.44 + 0.055 * Math.sin(t * (0.7 + i * 0.08) + i * 1.9);
+    }
+  });
 
   // ---------- Benches & bins ----------
   const woodMat = mat(scene, "benchWood", C3(0.75, 0.65, 0.55), { tex: TEX.planks(scene) });
