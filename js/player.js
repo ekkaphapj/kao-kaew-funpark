@@ -3,15 +3,15 @@
 // ============================================================
 "use strict";
 
-// Build a simple humanoid rig. Returns node + limb pivots for walk animation.
-// Used for the local player and for remote online players.
+// Build a humanoid rig with a real face (eyes, brows, mouth), neck, hands
+// and shoes. Faces +Z. Used for the local player and remote online players.
 function createCharacterRig(scene, shirtHex) {
   const C3 = (r, g, b) => new BABYLON.Color3(r, g, b);
   const root = new BABYLON.TransformNode("charRig", scene);
 
   const skinMat = new BABYLON.StandardMaterial("skinMat" + shirtHex, scene);
-  skinMat.diffuseColor = C3(0.85, 0.65, 0.5);
-  skinMat.specularColor = C3(0.05, 0.05, 0.05);
+  skinMat.diffuseColor = C3(0.87, 0.68, 0.53);
+  skinMat.specularColor = C3(0.04, 0.04, 0.04);
   const shirtMat = new BABYLON.StandardMaterial("shirtMat" + shirtHex, scene);
   shirtMat.diffuseColor = BABYLON.Color3.FromHexString(shirtHex);
   shirtMat.specularColor = C3(0.05, 0.05, 0.05);
@@ -19,41 +19,124 @@ function createCharacterRig(scene, shirtHex) {
   pantsMat.diffuseColor = C3(0.16, 0.18, 0.28);
   pantsMat.specularColor = C3(0.05, 0.05, 0.05);
   const hairMat = new BABYLON.StandardMaterial("hairMat" + shirtHex, scene);
-  hairMat.diffuseColor = C3(0.08, 0.06, 0.05);
+  hairMat.diffuseColor = C3(0.09, 0.07, 0.05);
+  hairMat.specularColor = C3(0.12, 0.1, 0.08);
+  const shoeMat = new BABYLON.StandardMaterial("shoeMat" + shirtHex, scene);
+  shoeMat.diffuseColor = C3(0.12, 0.1, 0.09);
+  const eyeWhiteMat = new BABYLON.StandardMaterial("eyeWhiteM" + shirtHex, scene);
+  eyeWhiteMat.diffuseColor = C3(0.95, 0.94, 0.9);
+  eyeWhiteMat.emissiveColor = C3(0.22, 0.22, 0.2); // readable in the dark
+  eyeWhiteMat.specularColor = C3(0.3, 0.3, 0.3);
+  const pupilMat = new BABYLON.StandardMaterial("pupilM" + shirtHex, scene);
+  pupilMat.diffuseColor = C3(0.04, 0.03, 0.02);
+  const mouthMat = new BABYLON.StandardMaterial("mouthM" + shirtHex, scene);
+  mouthMat.diffuseColor = C3(0.45, 0.2, 0.18);
 
-  const torso = BABYLON.MeshBuilder.CreateCapsule("cTorso", { height: 0.62, radius: 0.19 }, scene);
-  torso.position.y = 1.15;
-  torso.material = shirtMat;
-  torso.parent = root;
-  const hips = BABYLON.MeshBuilder.CreateCapsule("cHips", { height: 0.24, radius: 0.17 }, scene);
-  hips.position.y = 0.86;
+  const parts = [];
+  function P(m) { parts.push(m); return m; }
+
+  // body
+  const hips = P(BABYLON.MeshBuilder.CreateCapsule("cHips", { height: 0.26, radius: 0.16 }, scene));
+  hips.position.y = 0.92;
   hips.material = pantsMat;
   hips.parent = root;
-  const head = BABYLON.MeshBuilder.CreateSphere("cHead", { diameter: 0.30, segments: 10 }, scene);
-  head.position.y = 1.62;
+  const torso = P(BABYLON.MeshBuilder.CreateCapsule("cTorso", { height: 0.6, radius: 0.175 }, scene));
+  torso.position.y = 1.22;
+  torso.scaling.z = 0.78; // flatter chest, less barrel-like
+  torso.material = shirtMat;
+  torso.parent = root;
+  // shoulders that visually connect the arms to the torso
+  for (const sx of [-1, 1]) {
+    const sh = P(BABYLON.MeshBuilder.CreateSphere("cShoulder", { diameter: 0.16, segments: 8 }, scene));
+    sh.position.set(sx * 0.21, 1.44, 0);
+    sh.material = shirtMat;
+    sh.parent = root;
+  }
+  // neck + head
+  const neck = P(BABYLON.MeshBuilder.CreateCylinder("cNeck", { height: 0.12, diameter: 0.11, tessellation: 8 }, scene));
+  neck.position.y = 1.56;
+  neck.material = skinMat;
+  neck.parent = root;
+  const head = P(BABYLON.MeshBuilder.CreateSphere("cHead", { diameter: 0.30, segments: 12 }, scene));
+  head.position.y = 1.71;
+  head.scaling.set(0.92, 1.06, 0.94);
   head.material = skinMat;
   head.parent = root;
-  const hair = BABYLON.MeshBuilder.CreateSphere("cHair", { diameter: 0.32, segments: 10 }, scene);
-  hair.position.set(0, 1.66, -0.02);
-  hair.scaling.set(1, 0.72, 1);
+  // hair: a cap over the top plus a patch at the back — face stays open
+  const hair = P(BABYLON.MeshBuilder.CreateSphere("cHair", { diameter: 0.32, segments: 12 }, scene));
+  hair.position.set(0, 1.782, -0.045);
+  hair.scaling.set(0.98, 0.62, 0.82);
   hair.material = hairMat;
   hair.parent = root;
+  const hairBack = P(BABYLON.MeshBuilder.CreateSphere("cHairB", { diameter: 0.27, segments: 10 }, scene));
+  hairBack.position.set(0, 1.7, -0.085);
+  hairBack.scaling.set(0.9, 0.95, 0.55);
+  hairBack.material = hairMat;
+  hairBack.parent = root;
+  // face: eyes, pupils, brows, nose, mouth (front = +Z)
+  for (const ex of [-1, 1]) {
+    const eye = P(BABYLON.MeshBuilder.CreateSphere("cEye", { diameter: 0.072, segments: 8 }, scene));
+    eye.position.set(ex * 0.058, 1.725, 0.108);
+    eye.scaling.set(1, 0.85, 0.55);
+    eye.material = eyeWhiteMat;
+    eye.parent = root;
+    const pupil = P(BABYLON.MeshBuilder.CreateSphere("cPupil", { diameter: 0.032, segments: 6 }, scene));
+    pupil.position.set(ex * 0.058, 1.723, 0.128);
+    pupil.material = pupilMat;
+    pupil.parent = root;
+    const brow = P(BABYLON.MeshBuilder.CreateBox("cBrow", { width: 0.07, height: 0.014, depth: 0.02 }, scene));
+    brow.position.set(ex * 0.058, 1.772, 0.118);
+    brow.rotation.z = ex * -0.12;
+    brow.material = hairMat;
+    brow.parent = root;
+  }
+  const nose = P(BABYLON.MeshBuilder.CreateSphere("cNose", { diameter: 0.045, segments: 6 }, scene));
+  nose.position.set(0, 1.693, 0.132);
+  nose.scaling.set(0.8, 0.9, 0.9);
+  nose.material = skinMat;
+  nose.parent = root;
+  const mouth = P(BABYLON.MeshBuilder.CreateBox("cMouth", { width: 0.075, height: 0.016, depth: 0.012 }, scene));
+  mouth.position.set(0, 1.638, 0.128);
+  mouth.material = mouthMat;
+  mouth.parent = root;
+  // ears
+  for (const ex of [-1, 1]) {
+    const ear = P(BABYLON.MeshBuilder.CreateSphere("cEar", { diameter: 0.055, segments: 6 }, scene));
+    ear.position.set(ex * 0.135, 1.7, 0);
+    ear.scaling.set(0.5, 1, 0.8);
+    ear.material = skinMat;
+    ear.parent = root;
+  }
 
-  function limb(name, len, rad, matl, px, hingeY) {
+  // limbs with hands / shoes attached so they swing together
+  function limb(name, len, rad, matl, px, hingeY, tip) {
     const pivot = new BABYLON.TransformNode(name + "_piv", scene);
     pivot.parent = root;
     pivot.position.set(px, hingeY, 0);
-    const m = BABYLON.MeshBuilder.CreateCapsule(name, { height: len, radius: rad }, scene);
+    const m = P(BABYLON.MeshBuilder.CreateCapsule(name, { height: len, radius: rad }, scene));
     m.position.y = -len / 2;
     m.material = matl;
     m.parent = pivot;
+    if (tip === "hand") {
+      const hand = P(BABYLON.MeshBuilder.CreateSphere(name + "_hand", { diameter: rad * 2.3, segments: 6 }, scene));
+      hand.position.y = -len - 0.01;
+      hand.material = skinMat;
+      hand.parent = pivot;
+    } else if (tip === "shoe") {
+      const shoe = P(BABYLON.MeshBuilder.CreateBox(name + "_shoe", { width: rad * 2.4, height: 0.09, depth: 0.27 }, scene));
+      shoe.position.set(0, -len - 0.02, 0.05);
+      shoe.material = shoeMat;
+      shoe.parent = pivot;
+    }
     return pivot;
   }
-  const armL = limb("cArmL", 0.58, 0.07, shirtMat, -0.29, 1.40);
-  const armR = limb("cArmR", 0.58, 0.07, shirtMat, 0.29, 1.40);
-  const legL = limb("cLegL", 0.78, 0.085, pantsMat, -0.15, 0.78);
-  const legR = limb("cLegR", 0.78, 0.085, pantsMat, 0.15, 0.78);
-  const parts = [torso, hips, head, hair, armL, armR, legL, legR];
+  const armL = limb("cArmL", 0.52, 0.058, shirtMat, -0.245, 1.42, "hand");
+  const armR = limb("cArmR", 0.52, 0.058, shirtMat, 0.245, 1.42, "hand");
+  const legL = limb("cLegL", 0.78, 0.082, pantsMat, -0.1, 0.84, "shoe");
+  const legR = limb("cLegR", 0.78, 0.082, pantsMat, 0.1, 0.84, "shoe");
+  // slight natural outward arm rest
+  armL.rotation.z = 0.07;
+  armR.rotation.z = -0.07;
 
   return {
     node: root,

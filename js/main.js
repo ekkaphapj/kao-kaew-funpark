@@ -79,6 +79,7 @@ window.addEventListener("DOMContentLoaded", () => {
       player.state.yaw = parseFloat(q.get("yaw")) || 0;
       player.state.pitch = parseFloat(q.get("pitch")) || 0;
       if (q.get("view") === "3") player.state.view = 3;
+      if (q.has("dist")) player.state.tpDist = parseFloat(q.get("dist")) || 5;
       loadingEl.style.display = "none";
     }
 
