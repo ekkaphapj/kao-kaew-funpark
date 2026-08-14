@@ -227,6 +227,15 @@ function buildEnvironment(scene) {
     { x: 120, z: 30, r: 80 },    // waterpark
     { x: 0, z: 170, r: 90 },     // coaster
     { x: 60, z: -160, r: 40 },   // haunted house
+    { x: -185, z: -5, r: 26 },   // theater
+    { x: -80, z: 100, r: 16 },   // mirror house
+    { x: 80, z: 100, r: 17 },    // arcade
+    { x: 115, z: -150, r: 18 },  // 4D cinema
+    { x: 30, z: 34, r: 10 },     // restrooms
+    { x: -200, z: -160, r: 24 }, // maintenance depot
+    { x: 130, z: -70, r: 20 },   // food court
+    { x: -72, z: -145, r: 32 },  // game booths
+    { x: 45, z: 0, r: 14 }, { x: 95, z: 0, r: 12 }, { x: 8, z: 55, r: 8 }, // kiosks
   ];
   function isClear(x, z) {
     for (const zn of zonesToAvoid) {

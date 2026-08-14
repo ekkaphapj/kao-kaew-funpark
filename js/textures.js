@@ -323,28 +323,16 @@ const TEX = (() => {
   }
 
   // ---------- Ghost face (for haunted house) ----------
+  // The screaming mouth is a TRANSPARENT hole — the building's real door sits
+  // behind it, so players walk in through the mouth.
   function ghostFace(scene) {
     const size = 512;
     const dt = new BABYLON.DynamicTexture("texGhost", { width: size, height: size }, scene, true);
+    dt.hasAlpha = true;
     const ctx = dt.getContext();
+    ctx.clearRect(0, 0, size, size);
     ctx.fillStyle = "#120a18";
     ctx.fillRect(0, 0, size, size);
-    // big screaming mouth (entrance)
-    ctx.fillStyle = "#000000";
-    ctx.beginPath();
-    ctx.ellipse(size / 2, size * 0.72, size * 0.22, size * 0.26, 0, 0, Math.PI * 2);
-    ctx.fill();
-    // teeth
-    ctx.fillStyle = "#c9c2b8";
-    for (let i = 0; i < 7; i++) {
-      const x = size / 2 - size * 0.2 + i * (size * 0.4 / 6.4);
-      ctx.beginPath();
-      ctx.moveTo(x, size * 0.48);
-      ctx.lineTo(x + 16, size * 0.48);
-      ctx.lineTo(x + 8, size * 0.58);
-      ctx.closePath();
-      ctx.fill();
-    }
     // eyes
     for (const sx of [-1, 1]) {
       const ex = size / 2 + sx * size * 0.18, ey = size * 0.3;
@@ -354,6 +342,28 @@ const TEX = (() => {
       eg.addColorStop(1, "rgba(30,4,10,0)");
       ctx.fillStyle = eg;
       ctx.beginPath(); ctx.arc(ex, ey, 52, 0, Math.PI * 2); ctx.fill();
+    }
+    // punch the mouth out so it becomes a see-through doorway
+    ctx.globalCompositeOperation = "destination-out";
+    ctx.beginPath();
+    ctx.ellipse(size / 2, size * 0.72, size * 0.22, size * 0.27, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalCompositeOperation = "source-over";
+    // mouth rim shadow + teeth overhanging the hole
+    ctx.strokeStyle = "#241028";
+    ctx.lineWidth = 10;
+    ctx.beginPath();
+    ctx.ellipse(size / 2, size * 0.72, size * 0.22, size * 0.27, 0, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.fillStyle = "#c9c2b8";
+    for (let i = 0; i < 7; i++) {
+      const x = size / 2 - size * 0.2 + i * (size * 0.4 / 6.4);
+      ctx.beginPath();
+      ctx.moveTo(x, size * 0.47);
+      ctx.lineTo(x + 16, size * 0.47);
+      ctx.lineTo(x + 8, size * 0.57);
+      ctx.closePath();
+      ctx.fill();
     }
     dt.update();
     return dt;
