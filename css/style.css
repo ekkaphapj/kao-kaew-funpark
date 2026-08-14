@@ -7,6 +7,9 @@ html, body {
   -webkit-user-select: none; user-select: none;
   font-family: 'Tahoma', 'Sarabun', sans-serif;
 }
+@supports (height: 100dvh) {
+  html, body { height: 100dvh; } /* fill the real screen behind mobile browser chrome */
+}
 #gameCanvas {
   width: 100%; height: 100%;
   display: block;
@@ -73,22 +76,49 @@ html, body {
   text-shadow: 0 1px 3px #000;
 }
 
-/* ---------- Mobile joystick ---------- */
+/* ---------- Online badge ---------- */
+#online {
+  position: absolute; top: 38px; left: 16px;
+  color: rgba(180,220,190,.9); font-size: 13px;
+  text-shadow: 0 1px 3px #000;
+}
+
+/* ---------- Fullscreen prompt ---------- */
+#btn-fs {
+  position: fixed; top: 64px; left: 50%;
+  transform: translateX(-50%);
+  z-index: 30; display: none;
+  padding: 10px 22px;
+  border-radius: 24px;
+  border: 2px solid rgba(255,200,120,.6);
+  background: rgba(40,28,10,.75);
+  color: #ffd98a; font-size: 15px; font-weight: bold;
+  box-shadow: 0 2px 14px rgba(0,0,0,.6);
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ---------- Mobile joysticks (left = move, right = turn) ---------- */
 #joystick-zone {
   position: fixed; left: 0; bottom: 0;
   width: 45%; height: 55%;
   z-index: 20; display: none;
   touch-action: none;
 }
-#joystick-base {
-  position: absolute; left: 40px; bottom: 48px;
+#joystick-zone-right {
+  position: fixed; right: 0; bottom: 0;
+  width: 45%; height: 55%;
+  z-index: 20; display: none;
+  touch-action: none;
+}
+#joystick-base, #joystick-base-r {
+  position: absolute;
   width: 120px; height: 120px;
   border-radius: 50%;
   background: rgba(140,150,220,.10);
   border: 2px solid rgba(160,170,230,.25);
   display: none;
 }
-#joystick-knob {
+#joystick-knob, #joystick-knob-r {
   position: absolute; left: 50%; top: 50%;
   width: 52px; height: 52px;
   margin: -26px 0 0 -26px;
@@ -96,10 +126,11 @@ html, body {
   background: rgba(190,200,255,.30);
   border: 2px solid rgba(200,210,255,.5);
 }
+#joystick-knob-r { background: rgba(255,205,140,.30); border-color: rgba(255,215,160,.5); }
 #mobile-buttons {
-  position: fixed; right: 18px; bottom: 40px;
-  z-index: 20; display: none;
-  flex-direction: column; gap: 14px;
+  position: fixed; right: 14px; top: 44px;
+  z-index: 25; display: none;
+  flex-direction: column; gap: 12px;
 }
 .mbtn {
   width: 58px; height: 58px;
@@ -111,6 +142,7 @@ html, body {
   box-shadow: 0 2px 10px rgba(0,0,0,.5);
 }
 .mbtn:active, .mbtn.active { background: rgba(255,170,60,.45); border-color: rgba(255,200,120,.7); }
-body.is-mobile #joystick-zone, body.is-mobile #mobile-buttons { display: flex; }
+body.is-mobile #joystick-zone, body.is-mobile #joystick-zone-right,
+body.is-mobile #mobile-buttons { display: flex; }
 body.is-mobile #hint-pc { display: none; }
 body.is-mobile #hint-mobile { display: block !important; }

@@ -24,13 +24,20 @@
 <!-- HUD -->
 <div id="hud">
   <div id="parkName">สวนสนุกเก้าแก้ว</div>
-  <div id="hint-pc" class="hint">คลิกเพื่อเริ่ม · WASD เดิน · Shift วิ่ง · V สลับมุมมอง · เลื่อนล้อเมาส์ ซูม</div>
-  <div id="hint-mobile" class="hint" style="display:none">จอยซ้าย เดิน · ลากจอขวา หมุนกล้อง</div>
+  <div id="online">⚪ ออฟไลน์</div>
+  <div id="hint-pc" class="hint">คลิกเพื่อเริ่ม · W/S เดินหน้า-ถอย · A/D สไลด์ · ◀▶ หมุนตัว · Shift วิ่ง · V สลับมุมมอง</div>
+  <div id="hint-mobile" class="hint" style="display:none">จอยซ้าย เดิน · จอยขวา หันซ้าย-ขวา</div>
 </div>
+
+<!-- Fullscreen prompt (mobile) -->
+<button id="btn-fs">⛶ แตะเพื่อเล่นแบบเต็มจอ</button>
 
 <!-- Mobile controls -->
 <div id="joystick-zone">
   <div id="joystick-base"><div id="joystick-knob"></div></div>
+</div>
+<div id="joystick-zone-right">
+  <div id="joystick-base-r"><div id="joystick-knob-r"></div></div>
 </div>
 <div id="mobile-buttons">
   <button id="btn-view" class="mbtn">👁</button>
@@ -38,11 +45,13 @@
 </div>
 
 <script src="https://cdn.babylonjs.com/babylon.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="js/textures.js"></script>
 <script src="js/environment.js"></script>
 <script src="js/buildings.js"></script>
 <script src="js/rides.js"></script>
 <script src="js/player.js"></script>
+<script src="js/net.js"></script>
 <script src="js/main.js"></script>
 </body>
 </html>

@@ -9,7 +9,8 @@ window.addEventListener("DOMContentLoaded", () => {
   const loadHint = document.getElementById("loadHint");
   const loadingEl = document.getElementById("loading");
 
-  const isMobile = ("ontouchstart" in window) || navigator.maxTouchPoints > 0;
+  const isMobile = ("ontouchstart" in window) || navigator.maxTouchPoints > 0
+    || location.search.includes("mobile=1");
 
   const engine = new BABYLON.Engine(canvas, true, {
     adaptToDeviceRatio: false,
@@ -105,6 +106,33 @@ window.addEventListener("DOMContentLoaded", () => {
     scene.blockMaterialDirtyMechanism = false;
     setProgress(100, "ยินดีต้อนรับ...");
 
+    // ---------- online multiplayer ----------
+    let net = { update() {} };
+    try {
+      net = initNet(scene, player);
+    } catch (e) {
+      console.warn("net disabled:", e);
+    }
+
+    // ---------- mobile fullscreen check ----------
+    const fsBtn = document.getElementById("btn-fs");
+    const fsSupported = !!document.documentElement.requestFullscreen;
+    function fsCheck() {
+      const active = !!document.fullscreenElement;
+      fsBtn.style.display = (isMobile && fsSupported && !active) ? "block" : "none";
+    }
+    fsBtn.addEventListener("click", () => {
+      document.documentElement.requestFullscreen({ navigationUI: "hide" })
+        .then(() => {
+          if (screen.orientation && screen.orientation.lock) {
+            screen.orientation.lock("landscape").catch(() => {});
+          }
+        })
+        .catch(() => {});
+    });
+    document.addEventListener("fullscreenchange", () => { fsCheck(); engine.resize(); });
+    fsCheck();
+
     // ---------- per-frame logic (runs on every render, even manual ones) ----------
     let t = 0;
     let firstFrame = true;
@@ -115,6 +143,7 @@ window.addEventListener("DOMContentLoaded", () => {
       lastTime = now;
       t += dt;
       player.update(dt);
+      net.update(dt);
       updateFlickers(dt, t);
       for (const u of PARK.updaters) u(dt, t);
       if (firstFrame) {

@@ -216,7 +216,10 @@ function buildEnvironment(scene) {
 
   // scatter — avoid center paths / ride zones
   const zonesToAvoid = [
-    { x: 0, z: -145, r: 20 }, { x: 0, z: 0, r: 40 }, { x: -80, z: 0, r: 20 }, { x: 80, z: 0, r: 20 },
+    // main avenue corridor: plaza down to the entrance gate
+    { x: 0, z: -60, r: 18 }, { x: 0, z: -110, r: 18 }, { x: 0, z: -145, r: 20 },
+    { x: 0, z: -180, r: 20 }, { x: 0, z: -215, r: 24 }, { x: 0, z: -245, r: 30 },
+    { x: 0, z: 0, r: 40 }, { x: -80, z: 0, r: 20 }, { x: 80, z: 0, r: 20 },
     { x: 0, z: 85, r: 16 }, { x: 0, z: -90, r: 90 },
     { x: -120, z: 60, r: 45 },   // ferris
     { x: -70, z: -40, r: 25 },   // carousel
