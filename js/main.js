@@ -38,6 +38,7 @@ window.addEventListener("DOMContentLoaded", () => {
     ["ปลุกดวงจันทร์...", () => buildEnvironment(scene)],
     ["เปิดไฟร้านค้า...", () => buildBuildings(scene)],
     ["สตาร์ทเครื่องเล่น...", () => buildRides(scene)],
+    ["เสกปราสาทผีสิง...", () => buildLandmarks(scene)],
   ];
 
   let player = null;
@@ -60,9 +61,11 @@ window.addEventListener("DOMContentLoaded", () => {
   }
 
   function finishSetup() {
-    // let zone point lights reach their zones (default cap is 4 lights/material)
+    // let zone point lights reach their zones (default cap is 4 lights/material);
+    // 10 so scoped lights (castle, haunted house) still get a slot after the
+    // 6 park-wide points + hemi + moon
     for (const m of scene.materials) {
-      if (m instanceof BABYLON.StandardMaterial) m.maxSimultaneousLights = 8;
+      if (m instanceof BABYLON.StandardMaterial) m.maxSimultaneousLights = 10;
     }
 
     player = createPlayer(scene, canvas);

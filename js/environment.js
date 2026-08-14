@@ -131,6 +131,17 @@ function buildEnvironment(scene) {
 
   // main avenue: entrance (south) -> plaza
   path("pMain", 12, 190, 0, -145);
+  // outer ring road connecting every zone (like a real park)
+  path("ringW", 6, 390, -195, 0);
+  path("ringE", 6, 390, 195, 0);
+  path("ringN", 6, 390, 0, 195, Math.PI / 2);
+  path("ringS", 6, 390, 0, -195, Math.PI / 2);
+  // spoke extensions out to the ring + connectors
+  path("pWestExt", 8, 55, -170, 0, Math.PI / 2);
+  path("pEastExt", 8, 55, 170, 0, Math.PI / 2);
+  path("pNorthExt", 8, 25, 0, 157);
+  path("pGrave", 5, 12, 200, -80, Math.PI / 2);   // ring -> graveyard gate
+  path("pCircus", 5, 112, 105, -56);              // east spoke -> circus tent
   // plaza disc
   const plaza = BABYLON.MeshBuilder.CreateDisc("plaza", { radius: 32, tessellation: 48 }, scene);
   plaza.rotation.x = Math.PI / 2;
@@ -154,27 +165,46 @@ function buildEnvironment(scene) {
   const step = 5;
   for (let i = -B; i <= B; i += step) {
     for (const [x, z] of [[i, -B], [i, B], [-B, i], [B, i]]) {
+      if (z === -B && Math.abs(x) < 12) continue; // entrance gate gap
       const inst = fencePostSrc.createInstance("fp");
       inst.position.set(x, 1.2, z);
       inst.freezeWorldMatrix();
     }
   }
-  // rails
-  for (const side of [[0, -B, 0], [0, B, 0], [-B, 0, Math.PI / 2], [B, 0, Math.PI / 2]]) {
+  // rails (south side split so the gate stays open to the parking lot)
+  const railSegs = [
+    { w: 2 * B + 0.4, x: 0, z: B, rot: 0 },
+    { w: 2 * B + 0.4, x: -B, z: 0, rot: Math.PI / 2 },
+    { w: 2 * B + 0.4, x: B, z: 0, rot: Math.PI / 2 },
+    { w: B - 11, x: -(B + 11) / 2, z: -B, rot: 0 },
+    { w: B - 11, x: (B + 11) / 2, z: -B, rot: 0 },
+  ];
+  for (const seg of railSegs) {
     for (const h of [0.7, 1.5, 2.25]) {
-      const rail = BABYLON.MeshBuilder.CreateBox("rail", { width: 2 * B + 0.4, height: 0.08, depth: 0.06 }, scene);
+      const rail = BABYLON.MeshBuilder.CreateBox("rail", { width: seg.w, height: 0.08, depth: 0.06 }, scene);
       rail.material = fenceMat;
-      rail.position.set(side[0], h, side[1]);
-      rail.rotation.y = side[2];
+      rail.position.set(seg.x, h, seg.z);
+      rail.rotation.y = seg.rot;
       rail.checkCollisions = true;
       rail.freezeWorldMatrix();
     }
   }
-  // invisible walls to keep player inside
-  for (const side of [[0, -B, 0], [0, B, 0], [-B, 0, Math.PI / 2], [B, 0, Math.PI / 2]]) {
-    const wall = BABYLON.MeshBuilder.CreateBox("bwall", { width: 2 * B, height: 6, depth: 0.5 }, scene);
-    wall.position.set(side[0], 3, side[1]);
-    wall.rotation.y = side[2];
+  // invisible barriers: sides + north closed, south split at the gate,
+  // and a far barrier past the parking lot so nobody walks off the world
+  const barriers = [
+    { w: 2 * B, x: 0, z: B, rot: 0 },
+    { w: 2 * B, x: -B, z: 0, rot: Math.PI / 2 },
+    { w: 2 * B, x: B, z: 0, rot: Math.PI / 2 },
+    { w: B - 11, x: -(B + 11) / 2, z: -B, rot: 0 },
+    { w: B - 11, x: (B + 11) / 2, z: -B, rot: 0 },
+    { w: 2 * B, x: 0, z: -279, rot: 0 },
+    { w: 30, x: -B - 15, z: -265, rot: Math.PI / 2 },
+    { w: 30, x: B + 15, z: -265, rot: Math.PI / 2 },
+  ];
+  for (const side of barriers) {
+    const wall = BABYLON.MeshBuilder.CreateBox("bwall", { width: side.w, height: 6, depth: 0.5 }, scene);
+    wall.position.set(side.x, 3, side.z);
+    wall.rotation.y = side.rot;
     wall.isVisible = false;
     wall.checkCollisions = true;
     wall.freezeWorldMatrix();
@@ -236,8 +266,16 @@ function buildEnvironment(scene) {
     { x: 130, z: -70, r: 20 },   // food court
     { x: -72, z: -145, r: 32 },  // game booths
     { x: 45, z: 0, r: 14 }, { x: 95, z: 0, r: 12 }, { x: 8, z: 55, r: 8 }, // kiosks
+    { x: 155, z: 135, r: 48 },  // swamp lake (has its own dead trees)
+    { x: 105, z: -112, r: 22 }, // circus tent
+    { x: 225, z: -80, r: 52 },  // graveyard
+    { x: 232, z: -228, r: 15 }, // secret tunnel
+    { x: 0, z: 183, r: 32 },    // castle
   ];
   function isClear(x, z) {
+    // keep the outer ring road clear of trees
+    const ax = Math.abs(x), az = Math.abs(z);
+    if ((ax > 185 && ax < 205 && az <= 205) || (az > 185 && az < 205 && ax <= 205)) return false;
     for (const zn of zonesToAvoid) {
       const dx = x - zn.x, dz = z - zn.z;
       if (dx * dx + dz * dz < zn.r * zn.r) return false;
