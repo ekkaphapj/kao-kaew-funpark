@@ -96,7 +96,7 @@ function createPlayer(scene, canvas) {
 
   // ---------- collider (capsule) ----------
   const root = BABYLON.MeshBuilder.CreateCapsule("playerRoot", { height: 1.8, radius: 0.35 }, scene);
-  root.position.set(0, 0.95, -228);   // just inside the gate
+  root.position.set(0, 0.95, -92);    // just inside the gate
   root.isVisible = false;
   root.checkCollisions = true;
   root.ellipsoid = new BABYLON.Vector3(0.35, 0.85, 0.35);
@@ -111,9 +111,9 @@ function createPlayer(scene, canvas) {
   function setCharVisible(v) { rig.setEnabled(v); }
 
   // ---------- camera ----------
-  const camera = new BABYLON.UniversalCamera("cam", new BABYLON.Vector3(0, 2, -232), scene);
+  const camera = new BABYLON.UniversalCamera("cam", new BABYLON.Vector3(0, 2, -96), scene);
   camera.minZ = 0.15;
-  camera.maxZ = 1600;
+  camera.maxZ = 1000;
   camera.fov = 1.05;
   camera.inputs.clear(); // we drive it manually
   scene.activeCamera = camera;

@@ -325,10 +325,12 @@ const TEX = (() => {
   // ---------- Ghost face (for haunted house) ----------
   // The screaming mouth is a TRANSPARENT hole — the building's real door sits
   // behind it, so players walk in through the mouth.
-  function ghostFace(scene) {
+  // solid=true keeps the mouth as opaque black (for portraits);
+  // default punches it transparent so it works as a doorway.
+  function ghostFace(scene, solid) {
     const size = 512;
-    const dt = new BABYLON.DynamicTexture("texGhost", { width: size, height: size }, scene, true);
-    dt.hasAlpha = true;
+    const dt = new BABYLON.DynamicTexture("texGhost" + (solid ? "S" : ""), { width: size, height: size }, scene, true);
+    dt.hasAlpha = !solid;
     const ctx = dt.getContext();
     ctx.clearRect(0, 0, size, size);
     ctx.fillStyle = "#120a18";
@@ -343,8 +345,12 @@ const TEX = (() => {
       ctx.fillStyle = eg;
       ctx.beginPath(); ctx.arc(ex, ey, 52, 0, Math.PI * 2); ctx.fill();
     }
-    // punch the mouth out so it becomes a see-through doorway
-    ctx.globalCompositeOperation = "destination-out";
+    // mouth: transparent doorway, or opaque black for the solid variant
+    if (solid) {
+      ctx.fillStyle = "#050308";
+    } else {
+      ctx.globalCompositeOperation = "destination-out";
+    }
     ctx.beginPath();
     ctx.ellipse(size / 2, size * 0.72, size * 0.22, size * 0.27, 0, 0, Math.PI * 2);
     ctx.fill();

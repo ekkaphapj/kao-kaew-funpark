@@ -72,7 +72,7 @@ function initNet(scene, player) {
   function addRemote(id, meta) {
     if (remotes.has(id) || id === myId) return;
     const sx = (meta && typeof meta.x === "number") ? meta.x : 0;
-    const sz = (meta && typeof meta.z === "number") ? meta.z : -228;
+    const sz = (meta && typeof meta.z === "number") ? meta.z : -92;
     const rig = createCharacterRig(scene, (meta && meta.color) || SHIRTS[1]);
     rig.node.position.set(sx, 0, sz);
     const tag = makeNameTag((meta && meta.name) || id, rig.node);

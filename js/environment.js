@@ -1,5 +1,7 @@
 // ============================================================
-// environment.js — sky, ground, paths, fences, trees, lamps
+// environment.js — compact fully-paved park: sky, ground,
+// streets, perimeter, planters, lamps. NO grass anywhere.
+// Park is 220x220 m (bounds ±110), everything packed tight.
 // ============================================================
 "use strict";
 
@@ -9,7 +11,7 @@ const PARK = {
   updaters: [],   // fn(dt, t)
   colliders: [],  // meshes that block the third-person camera
   mats: {},
-  bounds: 250,    // half size of park (500x500 m)
+  bounds: 110,    // half size of the park (220x220 m)
 };
 
 function registerFlicker(mat, baseColor, mode) {
@@ -26,11 +28,9 @@ function updateFlickers(dt, t) {
   for (const f of PARK.flickers) {
     let k = 1;
     if (f.mode === "buzz") {
-      // mostly on, tiny high-freq shimmer + rare dropouts
       k = 0.88 + 0.12 * Math.sin(t * 31 + f.seed * 7);
       if (Math.random() < 0.006) k *= 0.15;
     } else if (f.mode === "dying") {
-      // fluorescent tube about to die
       f.timer -= dt;
       if (f.timer <= 0) {
         f.state = f.state > 0.5 ? Math.random() * 0.25 : 0.7 + Math.random() * 0.3;
@@ -51,12 +51,12 @@ function mat(scene, name, diffuse, opts) {
   m.specularColor = opts.spec || new BABYLON.Color3(0.06, 0.06, 0.08);
   if (opts.emissive) m.emissiveColor = opts.emissive;
   if (opts.tex) { m.diffuseTexture = opts.tex; }
-  if (opts.uv) { m.diffuseTexture.uScale = opts.uv[0]; m.diffuseTexture.vScale = opts.uv[1]; }
   return m;
 }
 
 function buildEnvironment(scene) {
   const C3 = (r, g, b) => new BABYLON.Color3(r, g, b);
+  const B = PARK.bounds;
 
   // ---------- Lighting ----------
   const hemi = new BABYLON.HemisphericLight("hemi", new BABYLON.Vector3(0.2, 1, 0.1), scene);
@@ -73,11 +73,11 @@ function buildEnvironment(scene) {
   // ---------- Fog & sky ----------
   scene.clearColor = new BABYLON.Color4(0.012, 0.015, 0.045, 1);
   scene.fogMode = BABYLON.Scene.FOGMODE_EXP2;
-  scene.fogDensity = 0.0032;
+  scene.fogDensity = 0.0055;
   scene.fogColor = C3(0.045, 0.055, 0.11);
   scene.ambientColor = C3(0.12, 0.13, 0.2);
 
-  const sky = BABYLON.MeshBuilder.CreateSphere("sky", { diameter: 1500, sideOrientation: BABYLON.Mesh.BACKSIDE, segments: 16 }, scene);
+  const sky = BABYLON.MeshBuilder.CreateSphere("sky", { diameter: 900, sideOrientation: BABYLON.Mesh.BACKSIDE, segments: 16 }, scene);
   const skyMat = new BABYLON.StandardMaterial("skyMat", scene);
   skyMat.emissiveTexture = TEX.stars(scene);
   skyMat.diffuseColor = C3(0, 0, 0);
@@ -89,8 +89,8 @@ function buildEnvironment(scene) {
   sky.isPickable = false;
   sky.applyFog = false;
 
-  const moonPlane = BABYLON.MeshBuilder.CreatePlane("moon", { size: 80 }, scene);
-  moonPlane.position = new BABYLON.Vector3(330, 380, 420);
+  const moonPlane = BABYLON.MeshBuilder.CreatePlane("moon", { size: 60 }, scene);
+  moonPlane.position = new BABYLON.Vector3(200, 240, 260);
   moonPlane.lookAt(BABYLON.Vector3.Zero());
   const moonMat = new BABYLON.StandardMaterial("moonMat", scene);
   moonMat.emissiveTexture = TEX.moon(scene);
@@ -100,106 +100,84 @@ function buildEnvironment(scene) {
   moonPlane.material = moonMat;
   moonPlane.isPickable = false;
 
-  // ---------- Ground ----------
-  const ground = BABYLON.MeshBuilder.CreateGround("ground", { width: 560, height: 560, subdivisions: 4 }, scene);
-  const gTex = TEX.grass(scene);
-  gTex.uScale = 70; gTex.vScale = 70;
-  const gMat = mat(scene, "groundMat", C3(0.55, 0.6, 0.5), { tex: gTex });
-  gMat.maxSimultaneousLights = 8;
+  // ---------- Ground: ALL paved, no grass ----------
+  const ground = BABYLON.MeshBuilder.CreateGround("ground", { width: 340, height: 340, subdivisions: 4 }, scene);
+  const gTex = TEX.pavement(scene);
+  gTex.uScale = 46; gTex.vScale = 46;
+  const gMat = mat(scene, "groundMat", C3(0.52, 0.53, 0.58), { tex: gTex });
   ground.material = gMat;
   ground.checkCollisions = true;
   ground.freezeWorldMatrix();
 
-  // ---------- Paths ----------
-  const aTex = TEX.asphalt(scene);
-  const pathMat = mat(scene, "pathMat", C3(0.72, 0.72, 0.78), { tex: aTex });
-  pathMat.maxSimultaneousLights = 8;
-  const paveTex = TEX.pavement(scene);
-  const paveMat = mat(scene, "paveMat", C3(0.75, 0.75, 0.8), { tex: paveTex });
-  paveMat.maxSimultaneousLights = 8;
+  // ---------- Streets (darker asphalt strips) ----------
+  const pathMat = mat(scene, "pathMat", C3(0.7, 0.7, 0.76), { tex: TEX.asphalt(scene) });
+  pathMat.diffuseTexture.uScale = 3; pathMat.diffuseTexture.vScale = 26;
 
   function path(name, w, l, x, z, rotY) {
     const p = BABYLON.MeshBuilder.CreateGround(name, { width: w, height: l }, scene);
     p.position.set(x, 0.06, z);
     if (rotY) p.rotation.y = rotY;
     p.material = pathMat;
-    const t = pathMat.diffuseTexture;
     p.freezeWorldMatrix();
     return p;
   }
-  pathMat.diffuseTexture.uScale = 3; pathMat.diffuseTexture.vScale = 40;
+  // main avenue: gate (south) -> plaza
+  path("pMain", 12, 92, 0, -64);
+  // east-west midway street
+  path("pWest", 10, 86, -52, -10, Math.PI / 2);
+  path("pEast", 10, 86, 52, -10, Math.PI / 2);
+  // north avenue -> castle forecourt
+  path("pNorth", 10, 70, 0, 24);
+  // side spurs (west: food hall + game booths, east: water park)
+  path("pSpurW", 6, 56, -34, -60, Math.PI / 2);
+  path("pSpurE", 6, 56, 34, -60, Math.PI / 2);
+  // graveyard connector behind the castle
+  path("pGrave", 5, 64, 44, 58, Math.PI / 2);
 
-  // main avenue: entrance (south) -> plaza
-  path("pMain", 12, 190, 0, -145);
-  // outer ring road connecting every zone (like a real park)
-  path("ringW", 6, 390, -195, 0);
-  path("ringE", 6, 390, 195, 0);
-  path("ringN", 6, 390, 0, 195, Math.PI / 2);
-  path("ringS", 6, 390, 0, -195, Math.PI / 2);
-  // spoke extensions out to the ring + connectors
-  path("pWestExt", 8, 55, -170, 0, Math.PI / 2);
-  path("pEastExt", 8, 55, 170, 0, Math.PI / 2);
-  path("pNorthExt", 8, 25, 0, 157);
-  path("pGrave", 5, 12, 200, -80, Math.PI / 2);   // ring -> graveyard gate
-  path("pCircus", 5, 112, 105, -56);              // east spoke -> circus tent
   // plaza disc
-  const plaza = BABYLON.MeshBuilder.CreateDisc("plaza", { radius: 32, tessellation: 48 }, scene);
+  const paveMat = mat(scene, "paveMat", C3(0.72, 0.72, 0.78), { tex: TEX.pavement(scene) });
+  paveMat.diffuseTexture.uScale = 9; paveMat.diffuseTexture.vScale = 9;
+  const plaza = BABYLON.MeshBuilder.CreateDisc("plaza", { radius: 21, tessellation: 48 }, scene);
   plaza.rotation.x = Math.PI / 2;
-  plaza.position.y = 0.07;
-  paveTex.uScale = 10; paveTex.vScale = 10;
+  plaza.position.set(0, 0.07, -10);
   plaza.material = paveMat;
   plaza.freezeWorldMatrix();
-  // west spoke (rides), east spoke (waterpark), north spoke (coaster)
-  path("pWest", 10, 130, -80, 0, Math.PI / 2);
-  path("pEast", 10, 130, 80, 0, Math.PI / 2);
-  path("pNorth", 10, 120, 0, 85);
-  // shop street cross path
-  path("pShops", 8, 150, 0, -90, Math.PI / 2);
 
-  // ---------- Perimeter fence ----------
-  const fencePostSrc = BABYLON.MeshBuilder.CreateBox("fencePost", { width: 0.18, height: 2.4, depth: 0.18 }, scene);
-  const fenceMat = mat(scene, "fenceMat", C3(0.16, 0.17, 0.2), { spec: new BABYLON.Color3(0.15, 0.15, 0.2) });
-  fencePostSrc.material = fenceMat;
-  fencePostSrc.position.set(0, -50, 0); // hide source
-  const B = PARK.bounds;
-  const step = 5;
-  for (let i = -B; i <= B; i += step) {
-    for (const [x, z] of [[i, -B], [i, B], [-B, i], [B, i]]) {
-      if (z === -B && Math.abs(x) < 12) continue; // entrance gate gap
-      const inst = fencePostSrc.createInstance("fp");
-      inst.position.set(x, 1.2, z);
-      inst.freezeWorldMatrix();
-    }
-  }
-  // rails (south side split so the gate stays open to the parking lot)
-  const railSegs = [
-    { w: 2 * B + 0.4, x: 0, z: B, rot: 0 },
-    { w: 2 * B + 0.4, x: -B, z: 0, rot: Math.PI / 2 },
-    { w: 2 * B + 0.4, x: B, z: 0, rot: Math.PI / 2 },
-    { w: B - 11, x: -(B + 11) / 2, z: -B, rot: 0 },
-    { w: B - 11, x: (B + 11) / 2, z: -B, rot: 0 },
+  // ---------- Perimeter stone wall (with south gate gap) ----------
+  const wallM = mat(scene, "perimWallM", C3(0.3, 0.3, 0.34), { tex: TEX.brick(scene, "dark") });
+  wallM.diffuseTexture.uScale = 40; wallM.diffuseTexture.vScale = 1.4;
+  const WB = B - 0.8;
+  const wallSegs = [
+    { w: WB - 11, x: -(WB + 11) / 2, z: -WB, rot: 0 }, { w: WB - 11, x: (WB + 11) / 2, z: -WB, rot: 0 },
+    { w: 2 * WB, x: 0, z: WB, rot: 0 },
+    { w: 2 * WB, x: -WB, z: 0, rot: Math.PI / 2 }, { w: 2 * WB, x: WB, z: 0, rot: Math.PI / 2 },
   ];
-  for (const seg of railSegs) {
-    for (const h of [0.7, 1.5, 2.25]) {
-      const rail = BABYLON.MeshBuilder.CreateBox("rail", { width: seg.w, height: 0.08, depth: 0.06 }, scene);
-      rail.material = fenceMat;
-      rail.position.set(seg.x, h, seg.z);
-      rail.rotation.y = seg.rot;
-      rail.checkCollisions = true;
-      rail.freezeWorldMatrix();
+  for (const s of wallSegs) {
+    const wl = BABYLON.MeshBuilder.CreateBox("perimWall", { width: s.w, height: 2.6, depth: 0.7 }, scene);
+    wl.position.set(s.x, 1.3, s.z);
+    wl.rotation.y = s.rot;
+    wl.material = wallM;
+    wl.checkCollisions = true;
+    wl.freezeWorldMatrix();
+  }
+  const pilSrc = BABYLON.MeshBuilder.CreateBox("perimPil", { width: 1.1, height: 3.3, depth: 1.1 }, scene);
+  pilSrc.material = wallM;
+  pilSrc.position.set(0, -70, 0);
+  for (let i = -108; i <= 108; i += 18) {
+    for (const [x, z] of [[i, -WB], [i, WB], [-WB, i], [WB, i]]) {
+      if (z === -WB && Math.abs(x) < 13) continue; // entrance gap
+      const p = pilSrc.createInstance("pp");
+      p.position.set(x, 1.65, z);
+      p.freezeWorldMatrix();
     }
   }
-  // invisible barriers: sides + north closed, south split at the gate,
-  // and a far barrier past the parking lot so nobody walks off the world
+  // invisible barriers: gate side split; far barrier past the parking lot
   const barriers = [
     { w: 2 * B, x: 0, z: B, rot: 0 },
-    { w: 2 * B, x: -B, z: 0, rot: Math.PI / 2 },
-    { w: 2 * B, x: B, z: 0, rot: Math.PI / 2 },
-    { w: B - 11, x: -(B + 11) / 2, z: -B, rot: 0 },
-    { w: B - 11, x: (B + 11) / 2, z: -B, rot: 0 },
-    { w: 2 * B, x: 0, z: -279, rot: 0 },
-    { w: 30, x: -B - 15, z: -265, rot: Math.PI / 2 },
-    { w: 30, x: B + 15, z: -265, rot: Math.PI / 2 },
+    { w: 2 * B, x: -B, z: 0, rot: Math.PI / 2 }, { w: 2 * B, x: B, z: 0, rot: Math.PI / 2 },
+    { w: B - 11, x: -(B + 11) / 2, z: -B, rot: 0 }, { w: B - 11, x: (B + 11) / 2, z: -B, rot: 0 },
+    { w: 2 * B + 60, x: 0, z: -144, rot: 0 },
+    { w: 40, x: -B - 20, z: -124, rot: Math.PI / 2 }, { w: 40, x: B + 20, z: -124, rot: Math.PI / 2 },
   ];
   for (const side of barriers) {
     const wall = BABYLON.MeshBuilder.CreateBox("bwall", { width: side.w, height: 6, depth: 0.5 }, scene);
@@ -210,25 +188,9 @@ function buildEnvironment(scene) {
     wall.freezeWorldMatrix();
   }
 
-  // ---------- Trees ----------
+  // ---------- Dead trees in stone planters (no lawns to grow in) ----------
   const trunkMat = mat(scene, "trunkMat", C3(0.23, 0.18, 0.13));
-  const leafMat = mat(scene, "leafMat", C3(0.10, 0.14, 0.09));
   const deadMat = mat(scene, "deadMat", C3(0.16, 0.13, 0.11));
-
-  // leafy tree source
-  const trunk = BABYLON.MeshBuilder.CreateCylinder("t_trunk", { height: 5, diameterTop: 0.35, diameterBottom: 0.6, tessellation: 7 }, scene);
-  trunk.material = trunkMat;
-  const fol1 = BABYLON.MeshBuilder.CreateSphere("t_f1", { diameter: 5.5, segments: 6 }, scene);
-  fol1.position.y = 4.4; fol1.scaling.y = 0.85; fol1.material = leafMat;
-  const fol2 = BABYLON.MeshBuilder.CreateSphere("t_f2", { diameter: 3.6, segments: 6 }, scene);
-  fol2.position.set(1.4, 5.6, 0.6); fol2.material = leafMat;
-  const fol3 = BABYLON.MeshBuilder.CreateSphere("t_f3", { diameter: 3.2, segments: 6 }, scene);
-  fol3.position.set(-1.3, 5.4, -0.5); fol3.material = leafMat;
-  const treeSrc = BABYLON.Mesh.MergeMeshes([trunk, fol1, fol2, fol3], true, true, undefined, false, true);
-  treeSrc.name = "treeSrc";
-  treeSrc.position.set(0, -60, 0);
-
-  // dead tree source
   const dtrunk = BABYLON.MeshBuilder.CreateCylinder("d_trunk", { height: 6.5, diameterTop: 0.15, diameterBottom: 0.55, tessellation: 6 }, scene);
   dtrunk.material = deadMat;
   const branches = [dtrunk];
@@ -242,64 +204,43 @@ function buildEnvironment(scene) {
   }
   const deadSrc = BABYLON.Mesh.MergeMeshes(branches, true, true, undefined, false, true);
   deadSrc.name = "deadSrc";
-  deadSrc.position.set(0, -60, 0);
+  deadSrc.position.set(0, -70, 0);
 
-  // scatter — avoid center paths / ride zones
-  const zonesToAvoid = [
-    // main avenue corridor: plaza down to the entrance gate
-    { x: 0, z: -60, r: 18 }, { x: 0, z: -110, r: 18 }, { x: 0, z: -145, r: 20 },
-    { x: 0, z: -180, r: 20 }, { x: 0, z: -215, r: 24 }, { x: 0, z: -245, r: 30 },
-    { x: 0, z: 0, r: 40 }, { x: -80, z: 0, r: 20 }, { x: 80, z: 0, r: 20 },
-    { x: 0, z: 85, r: 16 }, { x: 0, z: -90, r: 90 },
-    { x: -120, z: 60, r: 45 },   // ferris
-    { x: -70, z: -40, r: 25 },   // carousel
-    { x: -150, z: -60, r: 30 },  // drop tower + swings
-    { x: 120, z: 30, r: 80 },    // waterpark
-    { x: 0, z: 170, r: 90 },     // coaster
-    { x: 60, z: -160, r: 40 },   // haunted house
-    { x: -185, z: -5, r: 26 },   // theater
-    { x: -80, z: 100, r: 16 },   // mirror house
-    { x: 80, z: 100, r: 17 },    // arcade
-    { x: 115, z: -150, r: 18 },  // 4D cinema
-    { x: 30, z: 34, r: 10 },     // restrooms
-    { x: -200, z: -160, r: 24 }, // maintenance depot
-    { x: 130, z: -70, r: 20 },   // food court
-    { x: -72, z: -145, r: 32 },  // game booths
-    { x: 45, z: 0, r: 14 }, { x: 95, z: 0, r: 12 }, { x: 8, z: 55, r: 8 }, // kiosks
-    { x: 155, z: 135, r: 48 },  // swamp lake (has its own dead trees)
-    { x: 105, z: -112, r: 22 }, // circus tent
-    { x: 225, z: -80, r: 52 },  // graveyard
-    { x: 232, z: -228, r: 15 }, // secret tunnel
-    { x: 0, z: 183, r: 32 },    // castle
+  const planterM = mat(scene, "planterM", C3(0.4, 0.4, 0.44), { tex: TEX.brick(scene, "light") });
+  const planterSrc = BABYLON.MeshBuilder.CreateBox("planterSrc", { width: 2.2, height: 0.8, depth: 2.2 }, scene);
+  planterSrc.material = planterM;
+  planterSrc.position.set(0, -70, 0);
+  const dirtM = mat(scene, "dirtM", C3(0.16, 0.13, 0.1));
+  const dirtSrc = BABYLON.MeshBuilder.CreateBox("dirtSrc", { width: 1.9, height: 0.1, depth: 1.9 }, scene);
+  dirtSrc.material = dirtM;
+  dirtSrc.position.set(0, -70, 0);
+
+  const planterSpots = [
+    [-8, -34], [8, -34], [-8, -96], [8, -96],
+    [-24, -16], [24, -16], [-24, -4], [24, -4],
+    [-70, -16], [-88, -4], [70, -16], [88, -4],
+    [-8, 8], [8, 8], [-8, 52], [8, 52],
+    [-58, -54], [58, -54], [16, -76], [-16, -44],
   ];
-  function isClear(x, z) {
-    // keep the outer ring road clear of trees
-    const ax = Math.abs(x), az = Math.abs(z);
-    if ((ax > 185 && ax < 205 && az <= 205) || (az > 185 && az < 205 && ax <= 205)) return false;
-    for (const zn of zonesToAvoid) {
-      const dx = x - zn.x, dz = z - zn.z;
-      if (dx * dx + dz * dz < zn.r * zn.r) return false;
+  planterSpots.forEach((s, i) => {
+    const pl = planterSrc.createInstance("planter" + i);
+    pl.position.set(s[0], 0.4, s[1]);
+    pl.checkCollisions = true;
+    pl.freezeWorldMatrix();
+    const dr = dirtSrc.createInstance("dirt" + i);
+    dr.position.set(s[0], 0.82, s[1]);
+    dr.freezeWorldMatrix();
+    if (i % 3 !== 2) { // most planters hold a dead tree
+      const d = deadSrc.createInstance("ptree" + i);
+      const sc = 0.45 + Math.random() * 0.3;
+      d.position.set(s[0], 3.25 * sc + 0.8, s[1]);
+      d.scaling.setAll(sc);
+      d.rotation.y = Math.random() * Math.PI * 2;
+      d.freezeWorldMatrix();
     }
-    return true;
-  }
-  let placed = 0, guard = 0;
-  while (placed < 110 && guard < 2500) {
-    guard++;
-    const x = (Math.random() * 2 - 1) * (B - 14);
-    const z = (Math.random() * 2 - 1) * (B - 14);
-    if (!isClear(x, z)) continue;
-    const src = Math.random() < 0.3 ? deadSrc : treeSrc;
-    const inst = src.createInstance("tree" + placed);
-    const s = 0.7 + Math.random() * 0.9;
-    inst.position.set(x, 60 + (src === deadSrc ? 3.25 : 2.5) * s - 60, z); // y offset since source is buried
-    inst.position.y = (src === deadSrc ? 3.25 : 2.5) * s;
-    inst.scaling.setAll(s);
-    inst.rotation.y = Math.random() * Math.PI * 2;
-    inst.freezeWorldMatrix();
-    placed++;
-  }
+  });
 
-  // ---------- Lamp posts along paths ----------
+  // ---------- Lamp posts ----------
   const poleMat = mat(scene, "poleMat", C3(0.13, 0.14, 0.17));
   const lampOnMat = new BABYLON.StandardMaterial("lampOn", scene);
   lampOnMat.diffuseColor = C3(0.2, 0.15, 0.05);
@@ -318,30 +259,29 @@ function buildEnvironment(scene) {
   const lampBase = BABYLON.Mesh.MergeMeshes([lpPole, lpArm], true, true, undefined, false, false);
   lampBase.material = poleMat;
   lampBase.name = "lampBase";
-  lampBase.position.set(0, -60, 0);
+  lampBase.position.set(0, -70, 0);
 
   const bulbSrcOn = BABYLON.MeshBuilder.CreateSphere("bulbOn", { diameter: 0.42, segments: 6 }, scene);
   bulbSrcOn.material = lampOnMat;
-  bulbSrcOn.position.set(0, -60, 0);
+  bulbSrcOn.position.set(0, -70, 0);
   const bulbSrcOn2 = bulbSrcOn.clone("bulbOn2");
   bulbSrcOn2.material = lampOnMat2;
   const bulbSrcDead = bulbSrcOn.clone("bulbDead");
   bulbSrcDead.material = lampDeadMat;
 
   const lampSpots = [];
-  for (let z = -230; z <= -70; z += 40) { lampSpots.push([7, z]); lampSpots.push([-7, z]); }
-  for (let x = -140; x <= -30; x += 36) { lampSpots.push([x, 6]); lampSpots.push([x, -6]); }
-  for (let x = 30; x <= 140; x += 36) { lampSpots.push([x, 6]); lampSpots.push([x, -6]); }
-  for (let z = 40; z <= 140; z += 40) { lampSpots.push([6, z]); lampSpots.push([-6, z]); }
-  // plaza ring
-  for (let i = 0; i < 8; i++) {
+  for (let z = -100; z <= -30; z += 22) { lampSpots.push([7, z]); lampSpots.push([-7, z]); }
+  for (let x = -90; x <= -20; x += 24) { lampSpots.push([x, -16]); lampSpots.push([x, -4]); }
+  for (let x = 20; x <= 90; x += 24) { lampSpots.push([x, -16]); lampSpots.push([x, -4]); }
+  for (let z = 14; z <= 52; z += 19) { lampSpots.push([6, z]); lampSpots.push([-6, z]); }
+  for (let i = 1; i < 8; i += 2) { // diagonals only — keep the four street mouths clear
     const a = (i / 8) * Math.PI * 2;
-    lampSpots.push([Math.cos(a) * 30, Math.sin(a) * 30]);
+    lampSpots.push([Math.cos(a) * 19, -10 + Math.sin(a) * 19]);
   }
   lampSpots.forEach((s, i) => {
     const li = lampBase.createInstance("lamp" + i);
     li.position.set(s[0], 2.75, s[1]);
-    const towardCenter = Math.atan2(-s[0], -s[1]);
+    const towardCenter = Math.atan2(-s[0], -(s[1] + 10));
     li.rotation.y = towardCenter;
     li.freezeWorldMatrix();
     const roll = Math.random();
@@ -351,7 +291,7 @@ function buildEnvironment(scene) {
     bi.freezeWorldMatrix();
   });
 
-  // ---------- Key point lights (few, scoped by range) ----------
+  // ---------- Zone point lights ----------
   function pointLight(name, pos, color, intensity, range) {
     const l = new BABYLON.PointLight(name, pos, scene);
     l.diffuse = color;
@@ -360,15 +300,15 @@ function buildEnvironment(scene) {
     l.specular = color.scale(0.4);
     return l;
   }
-  pointLight("plEntrance", new BABYLON.Vector3(0, 9, -238), C3(1, 0.6, 0.25), 2.0, 70);
-  pointLight("plPlaza", new BABYLON.Vector3(0, 8, 0), C3(0.5, 0.6, 1.0), 1.6, 80);
-  pointLight("plFerris", new BABYLON.Vector3(-120, 20, 60), C3(0.85, 0.4, 1.0), 1.9, 120);
-  pointLight("plShops", new BABYLON.Vector3(0, 6, -90), C3(1, 0.55, 0.2), 1.7, 90);
-  pointLight("plWater", new BABYLON.Vector3(120, 8, 30), C3(0.2, 0.8, 0.9), 1.7, 100);
-  const redL = pointLight("plTower", new BABYLON.Vector3(-150, 30, -60), C3(1, 0.15, 0.1), 1.4, 80);
-  PARK.updaters.push((dt, t) => { redL.intensity = 0.7 + 0.5 * Math.sin(t * 2.2); });
+  pointLight("plEntrance", new BABYLON.Vector3(0, 9, -100), C3(1, 0.6, 0.25), 2.0, 55);
+  pointLight("plPlaza", new BABYLON.Vector3(0, 8, -10), C3(0.5, 0.6, 1.0), 1.6, 55);
+  pointLight("plWestSt", new BABYLON.Vector3(-52, 7, -10), C3(1, 0.55, 0.2), 1.6, 60);
+  pointLight("plEastSt", new BABYLON.Vector3(52, 7, -10), C3(0.85, 0.4, 1.0), 1.6, 60);
+  pointLight("plWater", new BABYLON.Vector3(65, 8, -75), C3(0.2, 0.8, 0.9), 1.7, 60);
+  const redL = pointLight("plTower", new BABYLON.Vector3(95, 25, -10), C3(1, 0.15, 0.1), 1.2, 45);
+  PARK.updaters.push((dt, t) => { redL.intensity = 0.8 + 0.5 * Math.sin(t * 2.2); });
 
-  // ---------- Benches & bins & debris ----------
+  // ---------- Benches & bins ----------
   const woodMat = mat(scene, "benchWood", C3(0.75, 0.65, 0.55), { tex: TEX.planks(scene) });
   const seat = BABYLON.MeshBuilder.CreateBox("b_seat", { width: 1.8, height: 0.08, depth: 0.5 }, scene);
   seat.position.y = 0.45; seat.material = woodMat;
@@ -379,17 +319,17 @@ function buildEnvironment(scene) {
   const legR = legL.clone("b_l2"); legR.position.x = 0.8;
   const benchSrc = BABYLON.Mesh.MergeMeshes([seat, back, legL, legR], true, true, undefined, true, true);
   benchSrc.name = "benchSrc";
-  benchSrc.position.set(0, -60, 0);
+  benchSrc.position.set(0, -70, 0);
 
   const binMat = mat(scene, "binMat", C3(0.25, 0.3, 0.25), { tex: TEX.metal(scene) });
   const binSrc = BABYLON.MeshBuilder.CreateCylinder("binSrc", { height: 0.9, diameter: 0.55, tessellation: 10 }, scene);
   binSrc.material = binMat;
-  binSrc.position.set(0, -60, 0);
+  binSrc.position.set(0, -70, 0);
 
   const benchSpots = [
-    [10, -50, 0], [-10, -60, Math.PI], [10, -120, 0], [-10, -170, Math.PI],
-    [26, 12, -1.2], [-26, 14, 1.2], [12, 26, -2.4], [-40, -8, Math.PI / 2],
-    [40, 8, -Math.PI / 2], [8, 60, Math.PI], [-8, 100, 0],
+    [16, -26, -0.8], [-16, -26, 0.8], [12, -50, 0], [-12, -72, Math.PI],
+    [17, 4, -2.2], [-17, 4, 2.2], [12, 30, Math.PI / 2], [-12, 42, -Math.PI / 2],
+    [-40, -20, 0], [40, -20, 0],
   ];
   benchSpots.forEach((s, i) => {
     const b = benchSrc.createInstance("bench" + i);
@@ -399,7 +339,7 @@ function buildEnvironment(scene) {
     if (i % 2 === 0) {
       const bin = binSrc.createInstance("bin" + i);
       bin.position.set(s[0] + 1.6, 0.45, s[1]);
-      if (i % 4 === 0) { // tipped over bin
+      if (i % 4 === 0) {
         bin.rotation.z = Math.PI / 2 - 0.1;
         bin.position.y = 0.3;
       }
@@ -407,7 +347,7 @@ function buildEnvironment(scene) {
     }
   });
 
-  // a lone red balloon drifting near the plaza (creepy touch)
+  // lone red balloon drifting around the plaza
   const balloon = BABYLON.MeshBuilder.CreateSphere("balloon", { diameter: 0.5, segments: 10 }, scene);
   const balloonMat = new BABYLON.StandardMaterial("balloonMat", scene);
   balloonMat.diffuseColor = C3(0.7, 0.05, 0.05);
@@ -416,14 +356,14 @@ function buildEnvironment(scene) {
   balloonMat.specularPower = 128;
   balloon.material = balloonMat;
   const bstring = BABYLON.MeshBuilder.CreateCylinder("bstring", { height: 1.6, diameter: 0.012 }, scene);
-  bstring.material = fenceMat;
+  bstring.material = poleMat;
   bstring.parent = balloon;
   bstring.position.y = -1.0;
   PARK.updaters.push((dt, t) => {
     balloon.position.set(
-      14 + Math.sin(t * 0.21) * 6,
+      10 + Math.sin(t * 0.21) * 6,
       2.2 + Math.sin(t * 0.6) * 0.5,
-      -18 + Math.cos(t * 0.17) * 7
+      -16 + Math.cos(t * 0.17) * 7
     );
     balloon.rotation.z = Math.sin(t * 0.8) * 0.1;
   });
