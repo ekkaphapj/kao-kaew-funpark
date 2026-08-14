@@ -322,6 +322,41 @@ const TEX = (() => {
     return dt;
   }
 
+  // ---------- Grayscale height texture for inexpensive surface relief ----------
+  function surfaceBump(scene, name, kind) {
+    const size = 256, dt = makeDyn(scene, "texBump" + name, size), ctx = dt.getContext();
+    ctx.fillStyle = "#8b8b8b";
+    ctx.fillRect(0, 0, size, size);
+    for (let i = 0; i < 1200; i++) {
+      const g = Math.floor(rand(112, 158));
+      ctx.fillStyle = `rgba(${g},${g},${g},${rand(0.12, 0.38)})`;
+      ctx.beginPath();
+      ctx.arc(rand(0, size), rand(0, size), rand(0.5, 3.2), 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.strokeStyle = "rgba(28,28,28,.85)";
+    ctx.lineWidth = kind === "tile" ? 4 : 2;
+    if (kind === "tile") {
+      const step = size / 8;
+      for (let i = 0; i <= 8; i++) {
+        ctx.beginPath(); ctx.moveTo(i * step, 0); ctx.lineTo(i * step, size); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(0, i * step); ctx.lineTo(size, i * step); ctx.stroke();
+      }
+    } else {
+      for (let c = 0; c < 12; c++) {
+        let x = rand(0, size), y = rand(0, size);
+        ctx.beginPath(); ctx.moveTo(x, y);
+        for (let s = 0; s < 6; s++) {
+          x += rand(-24, 24); y += rand(-24, 24);
+          ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+      }
+    }
+    dt.update();
+    return dt;
+  }
+
   // ---------- Ghost face (for haunted house) ----------
   // The screaming mouth is a TRANSPARENT hole — the building's real door sits
   // behind it, so players walk in through the mouth.
@@ -375,5 +410,5 @@ const TEX = (() => {
     return dt;
   }
 
-  return { grass, asphalt, pavement, brick, planks, metal, stripes, sign, stars, moon, waterNoise, ghostFace };
+  return { grass, asphalt, pavement, brick, planks, metal, stripes, sign, stars, moon, waterNoise, surfaceBump, ghostFace };
 })();

@@ -12,6 +12,10 @@ const PARK = {
   colliders: [],  // meshes that block the third-person camera
   mats: {},
   bounds: 110,    // half size of the park (220x220 m)
+  isMobile: false,
+  lowQuality: false,
+  moonLight: null,
+  shadowGenerator: null,
 };
 
 function registerFlicker(mat, baseColor, mode) {
@@ -69,6 +73,7 @@ function buildEnvironment(scene) {
   moonLight.intensity = 1.05;
   moonLight.diffuse = C3(0.55, 0.62, 0.85);
   moonLight.specular = C3(0.25, 0.3, 0.45);
+  PARK.moonLight = moonLight;
 
   // ---------- Fog & sky ----------
   scene.clearColor = new BABYLON.Color4(0.012, 0.015, 0.045, 1);
@@ -104,14 +109,32 @@ function buildEnvironment(scene) {
   const ground = BABYLON.MeshBuilder.CreateGround("ground", { width: 340, height: 340, subdivisions: 4 }, scene);
   const gTex = TEX.pavement(scene);
   gTex.uScale = 46; gTex.vScale = 46;
-  const gMat = mat(scene, "groundMat", C3(0.52, 0.53, 0.58), { tex: gTex });
+  const gMat = new BABYLON.PBRMaterial("groundMat", scene);
+  gMat.albedoColor = C3(0.52, 0.53, 0.58);
+  gMat.albedoTexture = gTex;
+  gMat.metallic = 0;
+  gMat.roughness = 0.88;
+  if (!PARK.lowQuality) {
+    gMat.bumpTexture = TEX.surfaceBump(scene, "ground", "tile");
+    gMat.bumpTexture.uScale = 46; gMat.bumpTexture.vScale = 46;
+    gMat.bumpTexture.level = 0.22;
+  }
   ground.material = gMat;
   ground.checkCollisions = true;
   ground.freezeWorldMatrix();
 
   // ---------- Streets (darker asphalt strips) ----------
-  const pathMat = mat(scene, "pathMat", C3(0.7, 0.7, 0.76), { tex: TEX.asphalt(scene) });
-  pathMat.diffuseTexture.uScale = 3; pathMat.diffuseTexture.vScale = 26;
+  const pathMat = new BABYLON.PBRMaterial("pathMat", scene);
+  pathMat.albedoColor = C3(0.7, 0.7, 0.76);
+  pathMat.albedoTexture = TEX.asphalt(scene);
+  pathMat.albedoTexture.uScale = 3; pathMat.albedoTexture.vScale = 26;
+  pathMat.metallic = 0;
+  pathMat.roughness = 0.74;
+  if (!PARK.lowQuality) {
+    pathMat.bumpTexture = TEX.surfaceBump(scene, "path", "crack");
+    pathMat.bumpTexture.uScale = 3; pathMat.bumpTexture.vScale = 26;
+    pathMat.bumpTexture.level = 0.3;
+  }
 
   function path(name, w, l, x, z, rotY) {
     const p = BABYLON.MeshBuilder.CreateGround(name, { width: w, height: l }, scene);
@@ -135,13 +158,61 @@ function buildEnvironment(scene) {
   path("pGrave", 5, 64, 44, 58, Math.PI / 2);
 
   // plaza disc
-  const paveMat = mat(scene, "paveMat", C3(0.72, 0.72, 0.78), { tex: TEX.pavement(scene) });
-  paveMat.diffuseTexture.uScale = 9; paveMat.diffuseTexture.vScale = 9;
+  const paveMat = new BABYLON.PBRMaterial("paveMat", scene);
+  paveMat.albedoColor = C3(0.72, 0.72, 0.78);
+  paveMat.albedoTexture = TEX.pavement(scene);
+  paveMat.albedoTexture.uScale = 9; paveMat.albedoTexture.vScale = 9;
+  paveMat.metallic = 0;
+  paveMat.roughness = 0.64;
+  if (!PARK.lowQuality) {
+    paveMat.bumpTexture = TEX.surfaceBump(scene, "plaza", "tile");
+    paveMat.bumpTexture.uScale = 9; paveMat.bumpTexture.vScale = 9;
+    paveMat.bumpTexture.level = 0.26;
+  }
   const plaza = BABYLON.MeshBuilder.CreateDisc("plaza", { radius: 21, tessellation: 48 }, scene);
   plaza.rotation.x = Math.PI / 2;
   plaza.position.set(0, 0.07, -10);
   plaza.material = paveMat;
   plaza.freezeWorldMatrix();
+
+  // Raised curbs give the flat paths readable edges in moonlight.
+  const curbMat = mat(scene, "curbMat", C3(0.3, 0.31, 0.35), { tex: TEX.pavement(scene) });
+  const curbs = [
+    [-6.35, 0.12, -64, 0.35, 0.22, 92], [6.35, 0.12, -64, 0.35, 0.22, 92],
+    [-5.35, 0.12, 30, 0.35, 0.22, 58], [5.35, 0.12, 30, 0.35, 0.22, 58],
+  ];
+  for (const c of curbs) {
+    const curb = BABYLON.MeshBuilder.CreateBox("curb", { width: c[3], height: c[4], depth: c[5] }, scene);
+    curb.position.set(c[0], c[1], c[2]);
+    curb.material = curbMat;
+    curb.freezeWorldMatrix();
+  }
+
+  // Thin PBR puddles catch coloured point lights without expensive mirrors.
+  const puddleMat = new BABYLON.PBRMaterial("puddleMat", scene);
+  puddleMat.albedoColor = C3(0.025, 0.045, 0.075);
+  puddleMat.metallic = 0.12;
+  puddleMat.roughness = 0.16;
+  puddleMat.alpha = 0.62;
+  puddleMat.backFaceCulling = false;
+  puddleMat.needDepthPrePass = true;
+  const puddleSrc = BABYLON.MeshBuilder.CreateDisc("puddleSrc", { radius: 1, tessellation: 18 }, scene);
+  puddleSrc.rotation.x = Math.PI / 2;
+  puddleSrc.position.set(0, -70, 0);
+  puddleSrc.material = puddleMat;
+  const puddleCount = PARK.lowQuality ? 5 : (PARK.isMobile ? 11 : 22);
+  for (let i = 0; i < puddleCount; i++) {
+    const p = puddleSrc.createInstance("puddle" + i);
+    const avenue = i < Math.ceil(puddleCount * 0.6);
+    p.position.set(
+      avenue ? (Math.random() - 0.5) * 9 : (Math.random() - 0.5) * 155,
+      0.085,
+      avenue ? -98 + Math.random() * 135 : -22 + Math.random() * 26
+    );
+    p.scaling.set(0.7 + Math.random() * 2.2, 0.4 + Math.random() * 0.9, 1);
+    p.rotation.z = Math.random() * Math.PI;
+    p.freezeWorldMatrix();
+  }
 
   // ---------- Perimeter stone wall (with south gate gap) ----------
   const wallM = mat(scene, "perimWallM", C3(0.3, 0.3, 0.34), { tex: TEX.brick(scene, "dark") });
@@ -239,6 +310,19 @@ function buildEnvironment(scene) {
       d.freezeWorldMatrix();
     }
   });
+
+  // A cheap ring of instanced dead trees closes the skyline beyond the wall.
+  const skylineTrees = PARK.lowQuality ? 18 : 34;
+  for (let i = 0; i < skylineTrees; i++) {
+    const a = (i / skylineTrees) * Math.PI * 2 + Math.sin(i * 7.31) * 0.09;
+    const radius = 116 + (i % 4) * 3.5;
+    const d = deadSrc.createInstance("skyTree" + i);
+    const sc = 0.75 + (i % 5) * 0.1;
+    d.position.set(Math.cos(a) * radius, 3.25 * sc, Math.sin(a) * radius);
+    d.scaling.setAll(sc);
+    d.rotation.y = a + i;
+    d.freezeWorldMatrix();
+  }
 
   // ---------- Lamp posts ----------
   const poleMat = mat(scene, "poleMat", C3(0.13, 0.14, 0.17));
@@ -367,6 +451,36 @@ function buildEnvironment(scene) {
     );
     balloon.rotation.z = Math.sin(t * 0.8) * 0.1;
   });
+
+  // Sparse drifting dust. Disabled in low mode to avoid mobile overdraw.
+  if (!PARK.lowQuality) {
+    const dustTex = new BABYLON.DynamicTexture("dustTex", { width: 32, height: 32 }, scene, false);
+    dustTex.hasAlpha = true;
+    const dc = dustTex.getContext();
+    const dg = dc.createRadialGradient(16, 16, 1, 16, 16, 15);
+    dg.addColorStop(0, "rgba(255,230,175,.85)");
+    dg.addColorStop(0.3, "rgba(210,205,180,.32)");
+    dg.addColorStop(1, "rgba(160,180,220,0)");
+    dc.fillStyle = dg;
+    dc.fillRect(0, 0, 32, 32);
+    dustTex.update();
+    const dust = new BABYLON.ParticleSystem("parkDust", PARK.isMobile ? 70 : 180, scene);
+    dust.particleTexture = dustTex;
+    dust.emitter = new BABYLON.Vector3(0, 3, -15);
+    dust.minEmitBox = new BABYLON.Vector3(-90, 0, -85);
+    dust.maxEmitBox = new BABYLON.Vector3(90, 8, 100);
+    dust.color1 = new BABYLON.Color4(0.55, 0.58, 0.72, 0.22);
+    dust.color2 = new BABYLON.Color4(0.85, 0.66, 0.38, 0.16);
+    dust.colorDead = new BABYLON.Color4(0.2, 0.22, 0.35, 0);
+    dust.minSize = 0.025; dust.maxSize = 0.085;
+    dust.minLifeTime = 5; dust.maxLifeTime = 11;
+    dust.emitRate = PARK.isMobile ? 7 : 16;
+    dust.direction1 = new BABYLON.Vector3(-0.08, 0.015, -0.04);
+    dust.direction2 = new BABYLON.Vector3(0.12, 0.06, 0.06);
+    dust.minEmitPower = 0.12; dust.maxEmitPower = 0.42;
+    dust.updateSpeed = 0.018;
+    dust.start();
+  }
 
   return { ground };
 }

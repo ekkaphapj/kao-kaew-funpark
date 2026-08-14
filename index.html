@@ -25,9 +25,19 @@
 <div id="hud">
   <div id="parkName">สวนสนุกเก้าแก้ว</div>
   <div id="online">⚪ ออฟไลน์</div>
-  <div id="hint-pc" class="hint">คลิกเพื่อเริ่ม · W/S เดินหน้า-ถอย · A/D สไลด์ · ◀▶ หมุนตัว · Shift วิ่ง · V สลับมุมมอง</div>
+  <div id="hint-pc" class="hint">คลิกเพื่อเริ่ม · W/S เดินหน้า-ถอย · A/D สไลด์ · ◀▶ หมุนตัว · Shift วิ่ง · V สลับมุมมอง · M ปิดเสียง</div>
   <div id="hint-mobile" class="hint" style="display:none">จอยซ้าย เดิน · จอยขวา หันซ้าย-ขวา</div>
 </div>
+
+<!-- Audio control -->
+<button id="btn-audio" type="button" aria-label="ปิดเสียง" aria-pressed="false" title="ปิดเสียง (M)">
+  <span class="audio-icon" aria-hidden="true">🔊</span>
+  <span class="audio-label">เสียง</span>
+</button>
+<button id="btn-quality" type="button" aria-label="สลับคุณภาพกราฟิก" title="สลับคุณภาพกราฟิก">
+  <span class="quality-icon" aria-hidden="true">⚡</span>
+  <span class="quality-label">โหมดลื่น</span>
+</button>
 
 <!-- Join dialog: enter your name -->
 <div id="join">
@@ -63,6 +73,7 @@
 <script src="js/landmarks.js"></script>
 <script src="js/player.js"></script>
 <script src="js/net.js"></script>
+<script src="js/audio.js"></script>
 <script src="js/main.js"></script>
 </body>
 </html>

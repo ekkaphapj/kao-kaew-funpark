@@ -37,6 +37,7 @@ function buildLandmarks(scene) {
   })();
 
   function groundFog(name, x, z, w, d) {
+    if (PARK.lowQuality && /graveFog2|tunnelFog|plazaFog/.test(name)) return null;
     const p = BABYLON.MeshBuilder.CreateGround(name, { width: w, height: d }, scene);
     p.position.set(x, 0.55 + Math.random() * 0.4, z);
     const m = new BABYLON.StandardMaterial(name + "M", scene);
@@ -55,7 +56,10 @@ function buildLandmarks(scene) {
     return p;
   }
 
+  let wispCount = 0;
   function wisp(x, z, radius, hue) {
+    wispCount++;
+    if (PARK.lowQuality && wispCount % 2 === 0) return;
     const orb = BABYLON.MeshBuilder.CreateSphere("wisp", { diameter: 0.34, segments: 8 }, scene);
     const m = new BABYLON.StandardMaterial("wispM", scene);
     m.emissiveColor = hue || C3(0.5, 0.95, 0.6);
