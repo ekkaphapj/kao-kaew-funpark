@@ -1,0 +1,116 @@
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body {
+  width: 100%; height: 100%;
+  overflow: hidden;
+  background: #05060f;
+  touch-action: none;
+  -webkit-user-select: none; user-select: none;
+  font-family: 'Tahoma', 'Sarabun', sans-serif;
+}
+#gameCanvas {
+  width: 100%; height: 100%;
+  display: block;
+  outline: none;
+  touch-action: none;
+}
+
+/* ---------- Loading ---------- */
+#loading {
+  position: fixed; inset: 0;
+  background: radial-gradient(ellipse at 50% 40%, #10122b 0%, #04040c 70%);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 100;
+  transition: opacity 1.2s ease;
+}
+#loading.done { opacity: 0; pointer-events: none; }
+.load-inner { text-align: center; }
+.load-title {
+  font-size: clamp(34px, 8vw, 64px);
+  font-weight: bold;
+  color: #ffd98a;
+  text-shadow: 0 0 18px rgba(255, 170, 60, .8), 0 0 60px rgba(255, 120, 30, .4);
+  animation: flick 3.1s infinite;
+}
+.load-sub {
+  margin-top: 6px;
+  letter-spacing: .5em;
+  font-size: clamp(10px, 2.4vw, 14px);
+  color: #7f86b8;
+}
+.load-bar {
+  width: min(320px, 70vw); height: 4px;
+  margin: 28px auto 12px;
+  background: #1b1e38;
+  border-radius: 2px; overflow: hidden;
+}
+#loadFill {
+  width: 0%; height: 100%;
+  background: linear-gradient(90deg, #ff9d3c, #ffd98a);
+  box-shadow: 0 0 12px rgba(255,170,60,.9);
+  transition: width .3s ease;
+}
+.load-hint { color: #5b6191; font-size: 13px; }
+@keyframes flick {
+  0%, 100% { opacity: 1; }
+  92% { opacity: 1; }
+  93% { opacity: .35; }
+  94% { opacity: 1; }
+  96% { opacity: .5; }
+  97% { opacity: 1; }
+}
+
+/* ---------- HUD ---------- */
+#hud { position: fixed; top: 0; left: 0; right: 0; pointer-events: none; z-index: 10; }
+#parkName {
+  position: absolute; top: 12px; left: 16px;
+  color: rgba(255, 217, 138, .85);
+  font-weight: bold; font-size: 18px;
+  text-shadow: 0 0 10px rgba(255,150,40,.6);
+}
+.hint {
+  position: absolute; top: 14px; right: 16px;
+  color: rgba(160,168,210,.75); font-size: 12px;
+  text-shadow: 0 1px 3px #000;
+}
+
+/* ---------- Mobile joystick ---------- */
+#joystick-zone {
+  position: fixed; left: 0; bottom: 0;
+  width: 45%; height: 55%;
+  z-index: 20; display: none;
+  touch-action: none;
+}
+#joystick-base {
+  position: absolute; left: 40px; bottom: 48px;
+  width: 120px; height: 120px;
+  border-radius: 50%;
+  background: rgba(140,150,220,.10);
+  border: 2px solid rgba(160,170,230,.25);
+  display: none;
+}
+#joystick-knob {
+  position: absolute; left: 50%; top: 50%;
+  width: 52px; height: 52px;
+  margin: -26px 0 0 -26px;
+  border-radius: 50%;
+  background: rgba(190,200,255,.30);
+  border: 2px solid rgba(200,210,255,.5);
+}
+#mobile-buttons {
+  position: fixed; right: 18px; bottom: 40px;
+  z-index: 20; display: none;
+  flex-direction: column; gap: 14px;
+}
+.mbtn {
+  width: 58px; height: 58px;
+  border-radius: 50%;
+  border: 2px solid rgba(200,210,255,.6);
+  background: rgba(24,28,58,.6);
+  color: #e6e9ff; font-size: 24px;
+  -webkit-tap-highlight-color: transparent;
+  box-shadow: 0 2px 10px rgba(0,0,0,.5);
+}
+.mbtn:active, .mbtn.active { background: rgba(255,170,60,.45); border-color: rgba(255,200,120,.7); }
+body.is-mobile #joystick-zone, body.is-mobile #mobile-buttons { display: flex; }
+body.is-mobile #hint-pc { display: none; }
+body.is-mobile #hint-mobile { display: block !important; }

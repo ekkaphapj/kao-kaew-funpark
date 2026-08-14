@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<title>สวนสนุกเก้าแก้ว — Kaokaew Haunted Park</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<canvas id="gameCanvas"></canvas>
+
+<!-- Loading screen -->
+<div id="loading">
+  <div class="load-inner">
+    <div class="load-title">สวนสนุกเก้าแก้ว</div>
+    <div class="load-sub">KAOKAEW AMUSEMENT PARK</div>
+    <div class="load-bar"><div id="loadFill"></div></div>
+    <div class="load-hint" id="loadHint">กำลังสร้างสวนสนุก...</div>
+  </div>
+</div>
+
+<!-- HUD -->
+<div id="hud">
+  <div id="parkName">สวนสนุกเก้าแก้ว</div>
+  <div id="hint-pc" class="hint">คลิกเพื่อเริ่ม · WASD เดิน · Shift วิ่ง · V สลับมุมมอง · เลื่อนล้อเมาส์ ซูม</div>
+  <div id="hint-mobile" class="hint" style="display:none">จอยซ้าย เดิน · ลากจอขวา หมุนกล้อง</div>
+</div>
+
+<!-- Mobile controls -->
+<div id="joystick-zone">
+  <div id="joystick-base"><div id="joystick-knob"></div></div>
+</div>
+<div id="mobile-buttons">
+  <button id="btn-view" class="mbtn">👁</button>
+  <button id="btn-run" class="mbtn">🏃</button>
+</div>
+
+<script src="https://cdn.babylonjs.com/babylon.js"></script>
+<script src="js/textures.js"></script>
+<script src="js/environment.js"></script>
+<script src="js/buildings.js"></script>
+<script src="js/rides.js"></script>
+<script src="js/player.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
