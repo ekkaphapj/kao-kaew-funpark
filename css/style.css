@@ -83,6 +83,56 @@ html, body {
   text-shadow: 0 1px 3px #000;
 }
 
+/* ---------- Join dialog ---------- */
+#join {
+  position: fixed; inset: 0;
+  background: rgba(3, 4, 12, .78);
+  display: none;
+  align-items: center; justify-content: center;
+  z-index: 90;
+}
+.join-card {
+  width: min(340px, 86vw);
+  padding: 28px 26px;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #14162e, #0b0c1c);
+  border: 1px solid rgba(255, 200, 120, .3);
+  box-shadow: 0 8px 40px rgba(0,0,0,.7), 0 0 30px rgba(255,150,40,.08);
+  text-align: center;
+}
+.join-title {
+  font-size: 26px; font-weight: bold;
+  color: #ffd98a;
+  text-shadow: 0 0 14px rgba(255,170,60,.6);
+}
+.join-sub {
+  margin: 8px 0 18px;
+  font-size: 13px; color: #8a90bb;
+}
+#join-name {
+  width: 100%;
+  padding: 11px 14px;
+  border-radius: 8px;
+  border: 1px solid rgba(160,170,230,.35);
+  background: rgba(10, 12, 26, .9);
+  color: #e8ecff; font-size: 16px;
+  text-align: center;
+  outline: none;
+}
+#join-name:focus { border-color: rgba(255,200,120,.6); }
+#join-btn {
+  margin-top: 14px;
+  width: 100%;
+  padding: 12px;
+  border-radius: 8px;
+  border: none;
+  background: linear-gradient(180deg, #c96a1e, #a04e10);
+  color: #fff2d8; font-size: 17px; font-weight: bold;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+#join-btn:active { filter: brightness(1.2); }
+
 /* ---------- Fullscreen prompt ---------- */
 #btn-fs {
   position: fixed; top: 64px; left: 50%;

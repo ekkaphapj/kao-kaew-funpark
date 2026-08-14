@@ -110,12 +110,33 @@ window.addEventListener("DOMContentLoaded", () => {
     scene.blockMaterialDirtyMechanism = false;
     setProgress(100, "ยินดีต้อนรับ...");
 
-    // ---------- online multiplayer ----------
+    // ---------- online multiplayer (joins after the name dialog) ----------
     let net = { update() {} };
-    try {
-      net = initNet(scene, player);
-    } catch (e) {
-      console.warn("net disabled:", e);
+    function startNet(name) {
+      try {
+        net = initNet(scene, player, name);
+      } catch (e) {
+        console.warn("net disabled:", e);
+      }
+    }
+    const joinEl = document.getElementById("join");
+    const joinName = document.getElementById("join-name");
+    const joinBtn = document.getElementById("join-btn");
+    if (q.has("px")) {
+      // debug/screenshot mode: skip the dialog
+      startNet("ทดสอบ" + Math.floor(Math.random() * 90 + 10));
+    } else {
+      joinName.value = localStorage.getItem("kk_name") || "";
+      joinEl.style.display = "flex";
+      setTimeout(() => joinName.focus(), 300);
+      const submit = () => {
+        const name = joinName.value.trim().slice(0, 12);
+        if (name) localStorage.setItem("kk_name", name);
+        joinEl.style.display = "none";
+        startNet(name);
+      };
+      joinBtn.addEventListener("click", submit);
+      joinName.addEventListener("keydown", (e) => { if (e.key === "Enter") submit(); });
     }
 
     // ---------- mobile fullscreen check ----------

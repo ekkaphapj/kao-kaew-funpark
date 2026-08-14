@@ -140,6 +140,7 @@ function createCharacterRig(scene, shirtHex) {
 
   return {
     node: root,
+    setShirtColor(hex) { shirtMat.diffuseColor = BABYLON.Color3.FromHexString(hex); },
     setEnabled(v) { for (const p of parts) p.setEnabled(v); },
     // phase-driven limb swing; amp 0 = standing
     swing(phase, amp) {
@@ -203,11 +204,16 @@ function createPlayer(scene, canvas) {
 
   // ---------- keyboard ----------
   const keys = {};
+  const typing = (e) => e.target && (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA");
   window.addEventListener("keydown", (e) => {
+    if (typing(e)) return; // don't walk while typing a name
     keys[e.code] = true;
     if (e.code === "KeyV") toggleView();
   });
-  window.addEventListener("keyup", (e) => { keys[e.code] = false; });
+  window.addEventListener("keyup", (e) => {
+    if (typing(e)) return;
+    keys[e.code] = false;
+  });
 
   function toggleView() {
     state.view = state.view === 1 ? 3 : 1;
@@ -388,5 +394,5 @@ function createPlayer(scene, canvas) {
     }
   }
 
-  return { update, state, root };
+  return { update, state, root, rig };
 }

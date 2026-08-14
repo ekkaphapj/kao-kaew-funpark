@@ -5,7 +5,7 @@
 // ============================================================
 "use strict";
 
-function initNet(scene, player) {
+function initNet(scene, player, playerName) {
   const badge = document.getElementById("online");
   const noNet = { update() {}, };
 
@@ -27,16 +27,20 @@ function initNet(scene, player) {
   }
 
   const myId = "p" + Math.random().toString(36).slice(2, 8);
-  const myName = "ผู้เล่น " + myId.slice(1, 5).toUpperCase();
-  const SHIRTS = ["#b32620", "#2076b3", "#2fa04a", "#b38a20"];
-  const myColor = SHIRTS[Math.floor(Math.random() * SHIRTS.length)];
+  const myName = (playerName || "").trim().slice(0, 12) || ("ผู้เล่น " + myId.slice(1, 5).toUpperCase());
+  // 8 distinct shirt colors — first pick by id hash, conflicts resolved on sync
+  const SHIRTS = ["#b32620", "#2076b3", "#2fa04a", "#b38a20", "#7a3fa0", "#20a08a", "#c05a20", "#b04a72"];
+  let hash = 0;
+  for (const c of myId) hash = (hash * 31 + c.charCodeAt(0)) >>> 0;
+  let myColor = SHIRTS[hash % SHIRTS.length];
+  player.rig.setShirtColor(myColor);
 
-  const remotes = new Map(); // id -> {rig, tag, target, cur, phase, lastX, lastZ}
+  const remotes = new Map(); // id -> {rig, tag, target, color, phase, lastX, lastZ}
   let connected = false;
 
   function setBadge(n) {
     if (!badge) return;
-    badge.textContent = connected ? `🟢 ออนไลน์ ${n}/4` : "⚪ ออฟไลน์";
+    badge.textContent = connected ? `🟢 ${myName} · ออนไลน์ ${n}/4` : "⚪ ออฟไลน์";
   }
 
   function makeNameTag(name, parent) {
@@ -73,11 +77,12 @@ function initNet(scene, player) {
     if (remotes.has(id) || id === myId) return;
     const sx = (meta && typeof meta.x === "number") ? meta.x : 0;
     const sz = (meta && typeof meta.z === "number") ? meta.z : -92;
-    const rig = createCharacterRig(scene, (meta && meta.color) || SHIRTS[1]);
+    const color = (meta && meta.color) || SHIRTS[1];
+    const rig = createCharacterRig(scene, color);
     rig.node.position.set(sx, 0, sz);
     const tag = makeNameTag((meta && meta.name) || id, rig.node);
     remotes.set(id, {
-      rig, tag,
+      rig, tag, color,
       target: { x: sx, z: sz, yaw: (meta && meta.yaw) || 0 },
       phase: 0, lastX: sx, lastZ: sz,
     });
@@ -101,6 +106,14 @@ function initNet(scene, player) {
     },
   });
 
+  function trackSelf() {
+    const p = player.root.position;
+    channel.track({
+      name: myName, color: myColor,
+      x: +p.x.toFixed(1), z: +p.z.toFixed(1), yaw: +player.state.yaw.toFixed(2),
+    });
+  }
+
   channel.on("presence", { event: "sync" }, () => {
     const st = channel.presenceState();
     const ids = new Set(Object.keys(st));
@@ -109,6 +122,35 @@ function initNet(scene, player) {
     }
     for (const id of [...remotes.keys()]) {
       if (!ids.has(id)) removeRemote(id);
+    }
+    // ---- unique shirt colors ----
+    // if an earlier player (smaller id) already wears my color, I yield and
+    // switch to the first free color, then re-announce myself
+    const usedByOthers = new Set();
+    let mustYield = false;
+    for (const id of ids) {
+      if (id === myId) continue;
+      const meta = st[id][0];
+      if (meta && meta.color) {
+        usedByOthers.add(meta.color);
+        if (meta.color === myColor && id < myId) mustYield = true;
+      }
+    }
+    if (mustYield) {
+      const free = SHIRTS.find(c => !usedByOthers.has(c));
+      if (free) {
+        myColor = free;
+        player.rig.setShirtColor(myColor);
+        if (connected) trackSelf();
+      }
+    }
+    // apply color changes other players announced
+    for (const [id, r] of remotes) {
+      const meta = st[id] && st[id][0];
+      if (meta && meta.color && meta.color !== r.color) {
+        r.color = meta.color;
+        r.rig.setShirtColor(meta.color);
+      }
     }
     setBadge(ids.size);
   });
@@ -124,8 +166,7 @@ function initNet(scene, player) {
   channel.subscribe((status) => {
     if (status === "SUBSCRIBED") {
       connected = true;
-      const p = player.root.position;
-      channel.track({ name: myName, color: myColor, x: +p.x.toFixed(1), z: +p.z.toFixed(1), yaw: +player.state.yaw.toFixed(2) });
+      trackSelf();
       setBadge(remotes.size + 1);
     } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
       connected = false;
