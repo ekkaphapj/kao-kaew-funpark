@@ -116,7 +116,7 @@ window.addEventListener("DOMContentLoaded", () => {
     }
     const monster = createTicketKeeper(scene, player, audio);
     const mission = createMission(scene, player, audio);
-    window.KK = { player }; // debug/testing handle
+    window.KK = { player, monster }; // debug/testing handle
 
     // debug: position via URL params (?px=0&pz=-200&yaw=3.14&pitch=0&view=3)
     const q = startupQuery;
