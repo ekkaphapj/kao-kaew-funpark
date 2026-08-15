@@ -322,6 +322,21 @@ function createTicketKeeper(scene, player, audio) {
   function update(dt, network) {
     if (!started || !network) return;
     const authority = network.isAuthority;
+    // just promoted (previous host froze or left): inherit its last known
+    // simulation so the keeper continues seamlessly instead of resetting
+    if (authority && !lastAuthority && remoteTargetState &&
+        Date.now() - remoteTargetState.stamp < 15000) {
+      const s = remoteTargetState;
+      root.position.x = s.x;
+      root.position.z = s.z;
+      root.rotation.y = s.yaw;
+      setVisible(!!s.active);
+      activeRemaining = s.remaining || 0;
+      if (s.nextSpawn != null) nextSpawn = s.nextSpawn;
+      targetId = null;
+      if (s.active) chooseOutdoorPoint();
+      remoteTargetState = null;
+    }
     if (authority) {
       authorityUpdate(dt, network);
       broadcastTimer -= dt;

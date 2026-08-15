@@ -49,10 +49,20 @@ function initNet(scene, player, playerName) {
   let connected = false;
   let hostId = myId;
   let monsterRemoteState = null;
+  // liveness: last time we heard ANY broadcast from each peer. A background
+  // browser tab stops its game loop, so its heartbeats stop — a frozen host
+  // must lose the election or the monster freezes for everyone.
+  const lastActive = new Map();
+  const ALIVE_MS = 6000;
 
   function electHost() {
+    const now = Date.now();
     const candidates = [{ id: myId, joinedAt }];
-    for (const [id, r] of remotes) candidates.push({ id, joinedAt: r.joinedAt || joinedAt + 1 });
+    for (const [id, r] of remotes) {
+      if (now - (lastActive.get(id) || 0) < ALIVE_MS) {
+        candidates.push({ id, joinedAt: r.joinedAt || now });
+      }
+    }
     candidates.sort((a, b) => a.joinedAt - b.joinedAt || a.id.localeCompare(b.id));
     hostId = candidates[0].id;
   }
@@ -107,6 +117,7 @@ function initNet(scene, player, playerName) {
       joinedAt: (meta && meta.joinedAt) || Date.now(),
       phase: 0, lastX: sx, lastZ: sz,
     });
+    lastActive.set(id, Date.now());
     electHost();
     setBadge(remotes.size + 1);
   }
@@ -118,6 +129,7 @@ function initNet(scene, player, playerName) {
     r.tag.dispose();
     r.rig.dispose();
     remotes.delete(id);
+    lastActive.delete(id);
     electHost();
     setBadge(remotes.size + 1);
   }
@@ -183,6 +195,7 @@ function initNet(scene, player, playerName) {
 
   channel.on("broadcast", { event: "pos" }, ({ payload }) => {
     if (!payload || payload.id === myId) return;
+    lastActive.set(payload.id, Date.now());
     const r = remotes.get(payload.id);
     if (r) {
       r.target.x = payload.x; r.target.z = payload.z; r.target.yaw = payload.yaw;
@@ -192,7 +205,9 @@ function initNet(scene, player, playerName) {
   });
 
   channel.on("broadcast", { event: "monster-state" }, ({ payload }) => {
-    if (!payload || payload.hostId !== hostId || hostId === myId) return;
+    if (!payload) return;
+    lastActive.set(payload.hostId, Date.now());
+    if (payload.hostId !== hostId || hostId === myId) return;
     monsterRemoteState = payload;
   });
 
@@ -218,9 +233,16 @@ function initNet(scene, player, playerName) {
   // ---------- per-frame ----------
   let sendTimer = 0;
   let idleTimer = 0;
+  let electTimer = 0;
   let lastSent = { x: 0, z: 0, yaw: 0, inside: false, dead: false };
 
   function update(dt) {
+    // re-run the host election regularly so a frozen host is replaced fast
+    electTimer -= dt;
+    if (connected && electTimer <= 0) {
+      electTimer = 1.5;
+      electHost();
+    }
     // send my position ~10 Hz when it changed; keepalive every 2 s so late joiners sync
     sendTimer -= dt;
     idleTimer += dt;
