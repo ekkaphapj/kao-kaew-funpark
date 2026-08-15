@@ -292,6 +292,47 @@ function createParkAudio(player) {
     source.start(now);
   }
 
+  // ---- heartbeat driven by how close the Keeper is (0..1) ----
+  let threat = 0;
+  let nextBeatAt = 0;
+  function setThreat(level) { threat = Math.max(0, Math.min(1, level || 0)); }
+  function heartbeat() {
+    if (!ctx || muted || threat < 0.04 || ctx.currentTime < nextBeatAt) return;
+    const now = ctx.currentTime;
+    const vol = 0.14 + 0.3 * threat;
+    tone(52, now, 0.16, vol, "sine", effectsBus);
+    tone(48, now + 0.17, 0.14, vol * 0.6, "sine", effectsBus);
+    nextBeatAt = now + (1.2 - 0.8 * threat);
+  }
+
+  // bright little ding for picking up a ghost ticket
+  function playPickup() {
+    unlock();
+    if (!ctx || muted) return;
+    const now = ctx.currentTime;
+    tone(1318.5, now, 0.35, 0.22, "triangle", effectsBus);
+    tone(1760, now + 0.09, 0.5, 0.18, "triangle", effectsBus);
+  }
+
+  // victory / defeat jingles
+  function playWin() {
+    unlock();
+    if (!ctx || muted) return;
+    const now = ctx.currentTime;
+    [523.25, 659.25, 784, 1046.5].forEach((f, i) => {
+      tone(f, now + i * 0.16, 0.7, 0.2, "triangle", effectsBus);
+    });
+  }
+  function playLose() {
+    unlock();
+    if (!ctx || muted) return;
+    const now = ctx.currentTime;
+    [220, 207.65, 196, 185].forEach((f, i) => {
+      tone(f, now + i * 0.4, 0.9, 0.16, "sawtooth", effectsBus);
+    });
+    tone(49, now, 4, 0.14, "sine", effectsBus);
+  }
+
   // the Ticket Keeper's hunt siren — loud, rising, wrong
   function playAlarm() {
     unlock();
@@ -309,6 +350,7 @@ function createParkAudio(player) {
   function update() {
     if (!ctx || muted || ctx.state !== "running") return;
     scheduleMusic();
+    heartbeat();
 
     const x = player.root.position.x;
     const z = player.root.position.z;
@@ -360,5 +402,5 @@ function createParkAudio(player) {
     window.addEventListener("keydown", unlock, { passive: true });
   }
 
-  return { update, unlock, toggle, setMuted, playAlarm };
+  return { update, unlock, toggle, setMuted, playAlarm, setThreat, playPickup, playWin, playLose };
 }

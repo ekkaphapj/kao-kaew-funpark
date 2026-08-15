@@ -34,9 +34,18 @@
   <div><strong>สัญญาณเตือนภัย</strong><span>นายตรวจตั๋วออกล่าแล้ว — หลบเข้าอาคาร!</span></div>
 </div>
 <div id="monster-status" aria-live="polite"></div>
+<div id="mission-hud" aria-live="polite"></div>
 <div id="death-screen">
-  <div class="death-title">คุณถูกจับได้</div>
-  <div class="death-sub">กำลังกลับไปที่ทางเข้าสวนสนุก...</div>
+  <div class="death-title">คุณถูกจับได้!</div>
+  <div class="death-sub">นายตรวจตั๋วขังคุณไว้ในกรงตั๋ว...</div>
+</div>
+<div id="cage-overlay">🔒 โดนขังในกรงตั๋ว — รอเพื่อนมายืนข้างๆ 4 วินาทีเพื่อช่วย</div>
+<div id="endgame">
+  <div class="end-card">
+    <div id="endgame-title">🎉 หนีรอดสำเร็จ!</div>
+    <div id="endgame-sub"></div>
+    <button id="endgame-btn">🔄 เล่นรอบใหม่</button>
+  </div>
 </div>
 
 <!-- Audio control -->
@@ -85,6 +94,7 @@
 <script src="js/monster.js"></script>
 <script src="js/net.js"></script>
 <script src="js/audio.js"></script>
+<script src="js/mission.js"></script>
 <script src="js/main.js"></script>
 </body>
 </html>

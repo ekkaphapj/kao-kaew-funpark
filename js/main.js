@@ -115,6 +115,8 @@ window.addEventListener("DOMContentLoaded", () => {
       PARK.shadowGenerator = shadow;
     }
     const monster = createTicketKeeper(scene, player, audio);
+    const mission = createMission(scene, player, audio);
+    window.KK = { player }; // debug/testing handle
 
     // debug: position via URL params (?px=0&pz=-200&yaw=3.14&pitch=0&view=3)
     const q = startupQuery;
@@ -170,6 +172,7 @@ window.addEventListener("DOMContentLoaded", () => {
       } catch (e) {
         console.warn("net disabled:", e);
       }
+      mission.attachNet(net);
       monster.start();
     }
     const joinEl = document.getElementById("join");
@@ -224,7 +227,9 @@ window.addEventListener("DOMContentLoaded", () => {
       player.update(dt);
       audio.update();
       net.update(dt);
-      monster.update(dt, net.getMonsterContext());
+      const netCtx = net.getMonsterContext();
+      mission.update(dt, netCtx);
+      monster.update(dt, netCtx);
       updateFlickers(dt, t);
       for (const u of PARK.updaters) u(dt, t);
       if (firstFrame) {

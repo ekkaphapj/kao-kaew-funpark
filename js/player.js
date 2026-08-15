@@ -3,6 +3,37 @@
 // ============================================================
 "use strict";
 
+// Golden ticket cage the Keeper locks caught players inside.
+// Shared by the local player (player.js) and remote avatars (net.js).
+function buildCageMesh(scene) {
+  const node = new BABYLON.TransformNode("ticketCage", scene);
+  const barMat = new BABYLON.StandardMaterial("cageBarM", scene);
+  barMat.diffuseColor = new BABYLON.Color3(0.55, 0.42, 0.12);
+  barMat.emissiveColor = new BABYLON.Color3(0.45, 0.28, 0.04);
+  barMat.specularColor = new BABYLON.Color3(0.6, 0.5, 0.2);
+  for (let i = 0; i < 8; i++) {
+    const a = (i / 8) * Math.PI * 2;
+    const bar = BABYLON.MeshBuilder.CreateCylinder("cageBar", { height: 2.5, diameter: 0.07, tessellation: 6 }, scene);
+    bar.position.set(Math.cos(a) * 0.75, 1.25, Math.sin(a) * 0.75);
+    bar.material = barMat;
+    bar.parent = node;
+    bar.isPickable = false;
+  }
+  for (const y of [0.15, 2.45]) {
+    const ring = BABYLON.MeshBuilder.CreateTorus("cageRing", { diameter: 1.5, thickness: 0.09, tessellation: 16 }, scene);
+    ring.position.y = y;
+    ring.material = barMat;
+    ring.parent = node;
+    ring.isPickable = false;
+  }
+  const top = BABYLON.MeshBuilder.CreateCylinder("cageTop", { height: 0.5, diameterBottom: 1.6, diameterTop: 0.1, tessellation: 10 }, scene);
+  top.position.y = 2.7;
+  top.material = barMat;
+  top.parent = node;
+  top.isPickable = false;
+  return node;
+}
+
 // Build a humanoid rig with a real face (eyes, brows, mouth), neck, hands
 // and shoes. Faces +Z. Used for the local player and remote online players.
 function createCharacterRig(scene, shirtHex) {
@@ -220,23 +251,35 @@ function createPlayer(scene, canvas) {
     state.view = state.view === 1 ? 3 : 1;
   }
 
+  // caught by the Ticket Keeper: locked in a ticket cage until a friend
+  // stands close for a few seconds (mission.js handles the rescue timer)
+  let cageMesh = null;
   function die() {
     if (state.dead) return;
     state.dead = true;
     state.moveX = 0; state.moveZ = 0; state.turn = 0;
+    state.runLatch = false;
+    const runBtn = document.getElementById("btn-run");
+    if (runBtn) runBtn.classList.remove("active");
+    if (state.view === 1) state.view = 3; // watch yourself in the cage
+    if (!cageMesh) cageMesh = buildCageMesh(scene);
+    cageMesh.position.set(root.position.x, 0, root.position.z);
+    cageMesh.setEnabled(true);
+    const cage = document.getElementById("cage-overlay");
+    if (cage) cage.classList.add("show");
     const death = document.getElementById("death-screen");
-    if (death) death.classList.add("show");
-    setTimeout(() => {
-      root.position.set(0, 0.95, -92);
-      state.yaw = Math.PI;
-      state.pitch = 0.05;
-      state.running = false;
-      state.runLatch = false;
-      const runBtn = document.getElementById("btn-run");
-      if (runBtn) runBtn.classList.remove("active");
-      state.dead = false;
-      if (death) death.classList.remove("show");
-    }, 2200);
+    if (death) {
+      death.classList.add("show");
+      setTimeout(() => death.classList.remove("show"), 1600);
+    }
+  }
+
+  function revive() {
+    if (!state.dead) return;
+    state.dead = false;
+    if (cageMesh) cageMesh.setEnabled(false);
+    const cage = document.getElementById("cage-overlay");
+    if (cage) cage.classList.remove("show");
   }
 
   // ---------- mouse (pointer lock) ----------
@@ -329,8 +372,7 @@ function createPlayer(scene, canvas) {
   const rayOrigin = new BABYLON.Vector3();
 
   function update(dt) {
-    if (state.dead) return;
-    // turning: arrow keys on PC, right stick on mobile
+    // caged players can still turn and look around — they just can't move
     let turn = state.turn;
     if (Math.abs(turn) < 0.15) turn = 0; // stick deadzone
     turn += (keys["ArrowRight"] ? 1 : 0) - (keys["ArrowLeft"] ? 1 : 0);
@@ -342,9 +384,10 @@ function createPlayer(scene, canvas) {
       ix = (keys["KeyD"] ? 1 : 0) - (keys["KeyA"] ? 1 : 0);
       iz = (keys["KeyW"] || keys["ArrowUp"] ? 1 : 0) - (keys["KeyS"] || keys["ArrowDown"] ? 1 : 0);
     }
+    if (state.dead) { ix = 0; iz = 0; }
     const ilen = Math.hypot(ix, iz);
     if (ilen > 1) { ix /= ilen; iz /= ilen; }
-    state.running = keys["ShiftLeft"] || keys["ShiftRight"] || state.runLatch;
+    state.running = !state.dead && (keys["ShiftLeft"] || keys["ShiftRight"] || state.runLatch);
     const speed = state.running ? 8.2 : 3.6;
 
     // move relative to yaw
@@ -415,5 +458,5 @@ function createPlayer(scene, canvas) {
     }
   }
 
-  return { update, die, state, root, rig };
+  return { update, die, revive, state, root, rig };
 }

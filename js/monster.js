@@ -134,6 +134,41 @@ function createTicketKeeper(scene, player, audio) {
   const alertEl = document.getElementById("monster-alert");
   const spawnPoints = [[-98, 0], [98, 18], [72, 103], [-95, 72], [0, -105]];
 
+  // ---- fountain safe zone: blue light the Keeper won't enter, but
+  // standing in it drains the light (15 s), then it goes dark for 20 s ----
+  const FOUNTAIN = { x: 0, z: -10, r: 8 };
+  let fountainOn = true;
+  let fountainMeter = 15;
+  let fountainOffLeft = 0;
+  const fzRingMat = new BABYLON.StandardMaterial("fzRingM", scene);
+  fzRingMat.emissiveColor = C3(0.25, 0.75, 1.0);
+  fzRingMat.diffuseColor = C3(0.02, 0.08, 0.12);
+  fzRingMat.disableLighting = true;
+  const fzRing = BABYLON.MeshBuilder.CreateTorus("fzRing", { diameter: FOUNTAIN.r * 2, thickness: 0.16, tessellation: 40 }, scene);
+  fzRing.position.set(FOUNTAIN.x, 0.25, FOUNTAIN.z);
+  fzRing.material = fzRingMat;
+  fzRing.isPickable = false;
+  const fzGlow = BABYLON.MeshBuilder.CreateDisc("fzGlow", { radius: FOUNTAIN.r, tessellation: 40 }, scene);
+  fzGlow.rotation.x = Math.PI / 2;
+  fzGlow.position.set(FOUNTAIN.x, 0.12, FOUNTAIN.z);
+  const fzGlowMat = new BABYLON.StandardMaterial("fzGlowM", scene);
+  fzGlowMat.emissiveColor = C3(0.1, 0.35, 0.5);
+  fzGlowMat.alpha = 0.1;
+  fzGlowMat.disableLighting = true;
+  fzGlow.material = fzGlowMat;
+  fzGlow.isPickable = false;
+
+  function inFountainZone(px, pz) {
+    return Math.hypot(px - FOUNTAIN.x, pz - FOUNTAIN.z) < FOUNTAIN.r;
+  }
+
+  function updateFountainVisual(t) {
+    const blink = fountainOn && fountainMeter < 5 ? (Math.sin(t * 14) > 0 ? 1 : 0.15) : 1;
+    const on = fountainOn ? blink : 0.03;
+    fzRingMat.emissiveColor.set(0.25 * on, 0.75 * on, 1.0 * on);
+    fzGlowMat.alpha = fountainOn ? 0.1 * blink : 0.01;
+  }
+
   function setVisible(value) {
     active = value;
     rig.setEnabled(value);
@@ -149,12 +184,12 @@ function createTicketKeeper(scene, player, audio) {
   function chooseOutdoorPoint() {
     for (let tries = 0; tries < 30; tries++) {
       const p = new BABYLON.Vector3(-100 + Math.random() * 200, 0, -102 + Math.random() * 204);
-      if (!isInsideParkBuilding(p, -2.2)) {
+      if (!isInsideParkBuilding(p, -2.2) && !(fountainOn && inFountainZone(p.x, p.z))) {
         targetPoint.copyFrom(p);
         return;
       }
     }
-    targetPoint.set(0, 0, -10);
+    targetPoint.set(0, 0, -60);
   }
 
   function spawn() {
@@ -215,16 +250,36 @@ function createTicketKeeper(scene, player, audio) {
   }
 
   function authorityUpdate(dt, network) {
+    // fountain safe-zone simulation (host-authoritative)
+    const occupied = network.players.some(p => !p.dead && inFountainZone(p.x, p.z));
+    if (fountainOn) {
+      if (occupied) {
+        fountainMeter -= dt;
+        if (fountainMeter <= 0) { fountainOn = false; fountainOffLeft = 20; }
+      } else {
+        fountainMeter = Math.min(15, fountainMeter + dt * 0.6);
+      }
+    } else {
+      fountainOffLeft -= dt;
+      if (fountainOffLeft <= 0) { fountainOn = true; fountainMeter = 15; }
+    }
+
+    // escape phase: the Keeper is always out, faster, and never rests
+    const escaping = PARK.missionPhase === 3;
+    if (escaping && !active) spawn();
+
     if (!active) {
       nextSpawn -= dt;
       if (nextSpawn <= 0) spawn();
       return;
     }
+    if (escaping) activeRemaining = Math.max(activeRemaining, 10);
     activeRemaining -= dt;
     if (activeRemaining <= 0) {
       despawn();
       return;
     }
+    const rage = escaping ? 1.25 : 1;
 
     for (const [id, left] of killCooldowns) {
       const value = left - dt;
@@ -232,7 +287,9 @@ function createTicketKeeper(scene, player, audio) {
     }
 
     scanTimer -= dt;
-    const outdoor = network.players.filter(p => !p.inside && !p.dead);
+    // safe: indoors, caged, or bathed in the fountain light
+    const outdoor = network.players.filter(p =>
+      !p.inside && !p.dead && !(fountainOn && inFountainZone(p.x, p.z)));
     let victim = outdoor.find(p => p.id === targetId);
     if (!victim || Math.hypot(victim.x - root.position.x, victim.z - root.position.z) > DETECT_RADIUS * 1.25) {
       targetId = null;
@@ -242,24 +299,30 @@ function createTicketKeeper(scene, player, audio) {
         let best = Infinity;
         for (const p of outdoor) {
           const d = Math.hypot(p.x - root.position.x, p.z - root.position.z);
-          if (d < best && canSee(p)) { best = d; victim = p; }
+          // sharp ears: running players are heard from 40 m, walkers only
+          // when very close (12 m) — sight still works at full range
+          const heard = d < (p.run ? 40 : 12);
+          if (d < best && (heard || canSee(p))) { best = d; victim = p; }
         }
       }
       if (victim) targetId = victim.id;
     }
-    if (victim && victim.inside) { victim = null; targetId = null; }
+    if (victim && (victim.inside || (fountainOn && inFountainZone(victim.x, victim.z)))) {
+      victim = null;
+      targetId = null;
+    }
 
     const destX = victim ? victim.x : targetPoint.x;
     const destZ = victim ? victim.z : targetPoint.z;
     const dx = destX - root.position.x, dz = destZ - root.position.z;
     const distance = Math.hypot(dx, dz);
     if (!victim && distance < 2.2) chooseOutdoorPoint();
-    const speed = victim ? CHASE_SPEED : WANDER_SPEED;
+    const speed = (victim ? CHASE_SPEED : WANDER_SPEED) * rage;
     const nx = distance > 0.001 ? dx / distance : 0;
     const nz = distance > 0.001 ? dz / distance : 0;
     const proposed = new BABYLON.Vector3(root.position.x + nx * speed * dt, 0, root.position.z + nz * speed * dt);
     const beforeX = root.position.x, beforeZ = root.position.z;
-    if (!isInsideParkBuilding(proposed, -1.0)) {
+    if (!isInsideParkBuilding(proposed, -1.0) && !(fountainOn && inFountainZone(proposed.x, proposed.z))) {
       root.moveWithCollisions(new BABYLON.Vector3(nx * speed * dt, -0.08, nz * speed * dt));
     } else {
       targetId = null;
@@ -292,6 +355,7 @@ function createTicketKeeper(scene, player, audio) {
       activeRemaining = state.remaining || 0;
       nextSpawn = state.nextSpawn == null ? nextSpawn : state.nextSpawn;
       targetId = state.targetId || null;
+      if (state.fOn !== undefined) { fountainOn = !!state.fOn; fountainMeter = state.fMeter || 0; }
     } else if (active) {
       activeRemaining = Math.max(0, activeRemaining - dt);
     } else {
@@ -316,6 +380,7 @@ function createTicketKeeper(scene, player, audio) {
       x: +root.position.x.toFixed(2), z: +root.position.z.toFixed(2), yaw: +root.rotation.y.toFixed(3),
       remaining: +activeRemaining.toFixed(1), nextSpawn: +nextSpawn.toFixed(1),
       targetId, chasing: !!targetId,
+      fOn: fountainOn, fMeter: +fountainMeter.toFixed(1),
     };
   }
 
@@ -352,6 +417,16 @@ function createTicketKeeper(scene, player, audio) {
       alertTimer -= dt;
       if (alertTimer <= 0 && alertEl) alertEl.classList.remove("show");
     }
+    // heartbeat scales with how close the Keeper is (all clients)
+    if (audio && audio.setThreat) {
+      if (active && !player.state.dead) {
+        const d = Math.hypot(root.position.x - player.root.position.x, root.position.z - player.root.position.z);
+        audio.setThreat((25 - d) / 20);
+      } else {
+        audio.setThreat(0);
+      }
+    }
+    updateFountainVisual(performance.now() / 1000);
     updateHud();
   }
 

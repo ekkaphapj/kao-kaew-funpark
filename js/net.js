@@ -9,10 +9,13 @@ function initNet(scene, player, playerName) {
   const badge = document.getElementById("online");
   const noNet = {
     update() {},
+    myId: "offline",
+    sendMission() {},
+    onMission() {},
     getMonsterContext() {
       return {
-        isAuthority: true, hostId: "offline", remoteState: null,
-        players: [{ id: "offline", x: player.root.position.x, z: player.root.position.z, inside: isInsideParkBuilding(player.root.position), dead: player.state.dead }],
+        isAuthority: true, hostId: "offline", myId: "offline", remoteState: null,
+        players: [{ id: "offline", x: player.root.position.x, z: player.root.position.z, inside: isInsideParkBuilding(player.root.position), dead: player.state.dead, run: player.state.running }],
         broadcast() {}, kill(id) { if (id === "offline") player.die(); },
       };
     },
@@ -201,7 +204,16 @@ function initNet(scene, player, playerName) {
       r.target.x = payload.x; r.target.z = payload.z; r.target.yaw = payload.yaw;
       r.inside = !!payload.inside;
       r.dead = !!payload.dead;
+      r.run = !!payload.run;
     }
+  });
+
+  // mission bus: pickups, deposits, rescues, escapes, host state
+  const missionHandlers = [];
+  channel.on("broadcast", { event: "mission" }, ({ payload }) => {
+    if (!payload) return;
+    if (payload.from) lastActive.set(payload.from, Date.now());
+    for (const h of missionHandlers) h(payload);
   });
 
   channel.on("broadcast", { event: "monster-state" }, ({ payload }) => {
@@ -259,7 +271,7 @@ function initNet(scene, player, playerName) {
         lastSent = { x: p.x, z: p.z, yaw, inside, dead };
         channel.send({
           type: "broadcast", event: "pos",
-          payload: { id: myId, x: +p.x.toFixed(2), z: +p.z.toFixed(2), yaw: +yaw.toFixed(3), inside, dead },
+          payload: { id: myId, x: +p.x.toFixed(2), z: +p.z.toFixed(2), yaw: +yaw.toFixed(3), inside, dead, run: player.state.running },
         });
       }
     }
@@ -268,6 +280,14 @@ function initNet(scene, player, playerName) {
     const k = 1 - Math.exp(-10 * dt);
     for (const r of remotes.values()) {
       const n = r.rig.node;
+      // caged friends get a golden ticket cage around them
+      if (r.dead && !r.cage) {
+        r.cage = buildCageMesh(scene);
+        r.cage.position.set(r.target.x, 0, r.target.z);
+      } else if (!r.dead && r.cage) {
+        r.cage.dispose();
+        r.cage = null;
+      }
       n.position.x += (r.target.x - n.position.x) * k;
       n.position.z += (r.target.z - n.position.z) * k;
       // shortest-path yaw lerp; remote rigs face where that player walks
@@ -288,16 +308,22 @@ function initNet(scene, player, playerName) {
   }
 
   function getMonsterContext() {
+    const now = Date.now();
     const players = [{
       id: myId, x: player.root.position.x, z: player.root.position.z,
       inside: isInsideParkBuilding(player.root.position), dead: player.state.dead,
+      run: player.state.running, alive: true,
     }];
     for (const [id, r] of remotes) {
-      players.push({ id, x: r.target.x, z: r.target.z, inside: r.inside, dead: r.dead });
+      players.push({
+        id, x: r.target.x, z: r.target.z, inside: r.inside, dead: r.dead, run: !!r.run,
+        // frozen tabs shouldn't block the team's win or trigger a loss
+        alive: now - (lastActive.get(id) || 0) < ALIVE_MS,
+      });
     }
     return {
       isAuthority: !connected || hostId === myId,
-      hostId, players, remoteState: monsterRemoteState,
+      hostId, myId, players, remoteState: monsterRemoteState,
       broadcast(state) {
         if (connected) channel.send({ type: "broadcast", event: "monster-state", payload: state });
       },
@@ -309,5 +335,15 @@ function initNet(scene, player, playerName) {
   }
 
   setBadge(1);
-  return { update, getMonsterContext };
+  return {
+    update, getMonsterContext,
+    myId,
+    sendMission(payload) {
+      if (connected) {
+        payload.from = myId;
+        channel.send({ type: "broadcast", event: "mission", payload });
+      }
+    },
+    onMission(handler) { missionHandlers.push(handler); },
+  };
 }
