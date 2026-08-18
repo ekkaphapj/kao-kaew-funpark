@@ -103,13 +103,27 @@ function buildLandmarks(scene) {
     }
     // great hall shell 30x13x16, door gap on the south face
     const W = 30, H = 13, D = 16, TH = 0.6, dw = 4.2, dh = 4.6;
-    const hallFloor = BABYLON.MeshBuilder.CreateGround("caHallFloor", { width: W - 0.4, height: D - 0.4 }, scene);
-    hallFloor.position.set(cx, 0.09, cz);
+    // Hall floor is built as slabs so the stairwell can open through it.
+    const OPEN = { x1: -13.8, x2: -10.2, z1: -3.2, z2: 6.8 }; // stair shaft (local)
     const hallFloorM = mat(scene, "caHallFloorM", C3(0.45, 0.44, 0.5), { tex: TEX.pavement(scene) });
     hallFloorM.diffuseTexture.uScale = 8; hallFloorM.diffuseTexture.vScale = 4;
-    hallFloor.material = hallFloorM;
-    hallFloor.freezeWorldMatrix();
-    castleMeshes.push(hallFloor);
+    // [x1, x2, z1, z2] rectangles that tile the hall around the shaft
+    const FLOOR_RECTS = [
+      [-14.7, OPEN.x1, -7.7, 7.7],
+      [OPEN.x2, 14.7, -7.7, 7.7],
+      [OPEN.x1, OPEN.x2, -7.7, OPEN.z1],
+      [OPEN.x1, OPEN.x2, OPEN.z2, 7.7],
+    ];
+    FLOOR_RECTS.forEach((r, i) => {
+      const slab = BABYLON.MeshBuilder.CreateBox("caHallFloor" + i, {
+        width: r[1] - r[0], height: 0.5, depth: r[3] - r[2],
+      }, scene);
+      slab.position.set(cx + (r[0] + r[1]) / 2, -0.16, cz + (r[2] + r[3]) / 2);
+      slab.material = hallFloorM;
+      slab.checkCollisions = true;
+      slab.freezeWorldMatrix();
+      castleMeshes.push(slab);
+    });
     cwall("caCeil", W, TH, D, 0, H + TH / 2, 0);
     cwall("caBack", W, H, TH, 0, H / 2, D / 2 - TH / 2);
     cwall("caSideW", TH, H, D, -W / 2 + TH / 2, H / 2, 0);
@@ -194,6 +208,349 @@ function buildLandmarks(scene) {
     hallLight.includedOnlyMeshes = castleMeshes;
     PARK.updaters.push((dt, t) => { hallLight.intensity = 1.2 + 0.4 * Math.sin(t * 1.1); });
 
+    // =========================================================
+    // CELLAR — the stairwell in the west end of the hall drops
+    // into four rooms off a central corridor. Lit only by its
+    // own lamps, so the way down is genuinely dark.
+    // =========================================================
+    {
+      const FL = -5.0, CH2 = 3.8, WT = 0.4;   // floor, room height, wall thickness
+      const CEIL = FL + CH2;                  // -1.2 = ceiling underside
+      const cellar = [];                      // meshes lit only by cellar lamps
+
+      // let the player descend anywhere under the castle footprint
+      PARK.lowZones.push({ x: cx, z: cz, w: 29.4, d: 15.4, minY: FL + 0.95 });
+
+      const wallM = mat(scene, "clWallM", C3(0.27, 0.25, 0.31), { tex: TEX.brick(scene, "dark") });
+      wallM.diffuseTexture.uScale = 6; wallM.diffuseTexture.vScale = 2;
+      const floorM = mat(scene, "clFloorM", C3(0.31, 0.3, 0.32), { tex: TEX.pavement(scene) });
+      floorM.diffuseTexture.uScale = 14; floorM.diffuseTexture.vScale = 7;
+      const woodM = mat(scene, "clWoodM", C3(0.36, 0.27, 0.17), { tex: TEX.planks(scene) });
+      const ironM = mat(scene, "clIronM", C3(0.17, 0.17, 0.2));
+      const brassM = mat(scene, "clBrassM", C3(0.44, 0.33, 0.13));
+      const paperM = mat(scene, "clPaperM", C3(0.56, 0.48, 0.31));
+      const boneM = mat(scene, "clBoneM", C3(0.72, 0.7, 0.62));
+
+      // Meshes are frozen in one pass at the end, so callers can still rotate
+      // them (and animated props opt out via metadata.animated).
+      function cbox(name, w, h, d, x, y, z, m, solid) {
+        const b = BABYLON.MeshBuilder.CreateBox(name, { width: w, height: h, depth: d }, scene);
+        b.position.set(cx + x, y, cz + z);
+        b.material = m || wallM;
+        b.isPickable = false;
+        if (solid !== false) { b.checkCollisions = true; }
+        cellar.push(b);
+        return b;
+      }
+      function ccyl(name, h, dia, x, y, z, m, solid) {
+        const c = BABYLON.MeshBuilder.CreateCylinder(name, { height: h, diameter: dia, tessellation: 10 }, scene);
+        c.position.set(cx + x, y, cz + z);
+        c.material = m || ironM;
+        c.isPickable = false;
+        if (solid) c.checkCollisions = true;
+        cellar.push(c);
+        return c;
+      }
+      // wall along one axis, with any number of door gaps (each gets a lintel)
+      function cwall2(name, axis, fixed, from, to, gaps) {
+        const list = (gaps || []).slice().sort((a, b) => a[0] - b[0]);
+        const segs = [];
+        let cursor = from;
+        for (const g of list) {
+          if (g[0] > cursor) segs.push([cursor, g[0]]);
+          cursor = Math.max(cursor, g[1]);
+        }
+        if (to > cursor) segs.push([cursor, to]);
+        for (const [a, b] of segs) {
+          if (b - a < 0.05) continue;
+          const len = b - a, mid = (a + b) / 2;
+          if (axis === "x") cbox(name, WT, CH2, len, fixed, FL + CH2 / 2, mid, wallM);
+          else cbox(name, len, CH2, WT, mid, FL + CH2 / 2, fixed, wallM);
+        }
+        for (const g of list) { // doorways are 2.5 m tall, wall above them
+          const len = g[1] - g[0], mid = (g[0] + g[1]) / 2, h = CH2 - 2.5;
+          if (axis === "x") cbox(name + "Lin", WT, h, len, fixed, FL + 2.5 + h / 2, mid, wallM);
+          else cbox(name + "Lin", len, h, WT, mid, FL + 2.5 + h / 2, fixed, wallM);
+        }
+      }
+
+      // ---- floor, ceiling (holed for the shaft), outer walls ----
+      cbox("clFloor", 28.8, 0.4, 14.8, 0, FL - 0.2, 0, floorM);
+      FLOOR_RECTS.forEach((r, i) => {
+        cbox("clCeil" + i, r[1] - r[0], WT, r[3] - r[2],
+          (r[0] + r[1]) / 2, CEIL + WT / 2, (r[2] + r[3]) / 2, wallM);
+      });
+      cwall2("clOuterW", "x", -14.2, -7.4, 7.4);
+      cwall2("clOuterE", "x", 14.2, -7.4, 7.4);
+      cwall2("clOuterS", "z", -7.2, -14.4, 14.4);
+      cwall2("clOuterN", "z", 7.2, -14.4, 14.4);
+      // The corridor hugs the south wall so it meets the foot of the stairs —
+      // anywhere further north would sit under the ramp with no headroom.
+      // Four rooms open off it to the north.
+      cwall2("clDivW", "x", -10, -7.2, 7.2, [[-6.4, -4.2]]);
+      cwall2("clCorrN", "z", -4, -10, 14.2,
+        [[-8.4, -6], [-2.7, -0.3], [3.3, 5.7], [9.5, 11.9]]);
+      for (const dx of [-4.5, 1.5, 7.5]) cwall2("clRoomDiv", "x", dx, -4, 7.2);
+
+      // ---- shaft walls between hall floor and cellar ceiling ----
+      const shaftH = 0.09 - CEIL + 0.4;
+      const shaftY = CEIL + shaftH / 2 - 0.2;
+      cbox("clShaftW", WT, shaftH, OPEN.z2 - OPEN.z1, OPEN.x1 - 0.1, shaftY, (OPEN.z1 + OPEN.z2) / 2, wallM);
+      cbox("clShaftE", WT, shaftH, OPEN.z2 - OPEN.z1, OPEN.x2 + 0.1, shaftY, (OPEN.z1 + OPEN.z2) / 2, wallM);
+      cbox("clShaftS", OPEN.x2 - OPEN.x1, shaftH, WT, (OPEN.x1 + OPEN.x2) / 2, shaftY, OPEN.z1 - 0.1, wallM);
+
+      // ---- the staircase: a smooth collision ramp + decorative steps ----
+      const RUN = OPEN.z2 - OPEN.z1;            // 10 m horizontal
+      const DROP = 0.09 - FL;                   // 5.09 m vertical
+      const ang = Math.atan2(DROP, RUN);
+      const shaftX = (OPEN.x1 + OPEN.x2) / 2;
+      const ramp = BABYLON.MeshBuilder.CreateBox("clRamp", {
+        width: 3.4, height: 0.4, depth: Math.hypot(RUN, DROP),
+      }, scene);
+      ramp.position.set(cx + shaftX, (0.09 + FL) / 2 - 0.2 / Math.cos(ang), cz + (OPEN.z1 + OPEN.z2) / 2);
+      ramp.rotation.x = -ang;                   // +Z end sits high
+      ramp.material = wallM;
+      ramp.checkCollisions = true;
+      ramp.isPickable = false;
+      ramp.freezeWorldMatrix();
+      cellar.push(ramp);
+      const STEPS = 17, run = RUN / STEPS, rise = DROP / STEPS;
+      for (let i = 0; i < STEPS; i++) {
+        // steps are visual only — the ramp underneath carries the player
+        cbox("clStep" + i, 3.4, 0.62, run, shaftX,
+          0.09 - (i + 1) * rise - 0.31, OPEN.z2 - (i + 0.5) * run, wallM, false);
+      }
+      // railing along the open side, so nobody trips in by accident
+      for (let i = 0; i <= 8; i++) {
+        const rz = OPEN.z1 + (i / 8) * RUN;
+        ccyl("clRailPost", 1.0, 0.09, OPEN.x2 + 0.05, 0.6, rz, ironM);
+      }
+      const rail = cbox("clRail", 0.1, 0.1, RUN, OPEN.x2 + 0.05, 1.05, (OPEN.z1 + OPEN.z2) / 2, ironM);
+      rail.checkCollisions = true;
+      cbox("clRailEnd", OPEN.x2 - OPEN.x1, 1.1, 0.12, shaftX, 0.64, OPEN.z1 - 0.05, ironM);
+
+      // ---- entrance sign + lantern at the top of the stairs ----
+      const signTex = TEX.sign(scene, "ห้องใต้ดิน · ห้ามลง", {
+        w: 768, h: 128, bg: "#0d0a14", fg: "#c99aff", glowColor: "#7020c0", fontSize: 62,
+      });
+      const signM = new BABYLON.StandardMaterial("clSignM", scene);
+      signM.diffuseTexture = signTex;
+      signM.emissiveTexture = signTex;
+      signM.emissiveColor = C3(1, 1, 1);
+      signM.disableLighting = true;
+      registerFlicker(signM, C3(1, 1, 1), "dying");
+      const sign = BABYLON.MeshBuilder.CreatePlane("clSign", { width: 3.4, height: 0.6 }, scene);
+      sign.position.set(cx + shaftX, 2.4, cz + OPEN.z2 + 0.1);
+      sign.rotation.y = Math.PI;
+      sign.material = signM;
+      sign.isPickable = false;
+      sign.freezeWorldMatrix();
+
+      const lampM = new BABYLON.StandardMaterial("clLampM", scene);
+      lampM.emissiveColor = C3(1, 0.62, 0.22);
+      lampM.diffuseColor = C3(0.16, 0.09, 0.02);
+      lampM.disableLighting = true;
+      registerFlicker(lampM, C3(1, 0.62, 0.22), "buzz");
+      function lantern(x, y, z) {
+        const l = BABYLON.MeshBuilder.CreateSphere("clLantern", { diameter: 0.34, segments: 6 }, scene);
+        l.position.set(cx + x, y, cz + z);
+        l.material = lampM;
+        l.isPickable = false;
+        l.freezeWorldMatrix();
+        return l;
+      }
+      // lanterns hug the shaft wall above head height, never the walking line
+      lantern(OPEN.x1 + 0.3, 2.9, OPEN.z2 - 0.4);
+      lantern(OPEN.x1 + 0.3, -0.4, 1.6);
+      lantern(-11, FL + 2.9, -5.4);
+
+      // ---- STAIR HALL (west): barrels and crates by the landing ----
+      for (const [bx, bz] of [[-13.2, -6.4], [-12.1, -6.6], [-13.4, -5.1]]) {
+        ccyl("clBarrel", 1.1, 0.85, bx, FL + 0.55, bz, woodM, true);
+        cbox("clBarrelTop", 0.9, 0.06, 0.9, bx, FL + 1.12, bz, ironM, false);
+      }
+      cbox("clCrate", 1.1, 1.1, 1.1, -13.1, FL + 0.55, -3.9, woodM);
+
+      // ---- CORRIDOR (south): pipes overhead, a puddle underfoot ----
+      for (const pz of [-6.4, -4.6]) {
+        const pipe = ccyl("clPipe", 23, 0.22, 2, CEIL - 0.45, pz, brassM);
+        pipe.rotation.z = Math.PI / 2;
+      }
+      for (const px of [-6, 2, 9]) {
+        ccyl("clPipeDrop", 0.7, 0.16, px, CEIL - 0.9, -5.5, brassM);
+      }
+      const puddle = BABYLON.MeshBuilder.CreateDisc("clPuddle", { radius: 1.5, tessellation: 20 }, scene);
+      puddle.rotation.x = Math.PI / 2;
+      puddle.position.set(cx + 4.5, FL + 0.03, cz - 5.5);
+      const puddleM = new BABYLON.StandardMaterial("clPuddleM", scene);
+      puddleM.diffuseColor = C3(0.05, 0.07, 0.08);
+      puddleM.specularColor = C3(0.6, 0.7, 0.75);
+      puddleM.specularPower = 128;
+      puddle.material = puddleM;
+      puddle.isPickable = false;
+      cellar.push(puddle);
+
+      // ---- ROOM 1: old ticket store (shelves of dead tickets) ----
+      for (const sz of [6.4, 4.2]) {
+        cbox("clShelfBack", 4.6, 0.12, 0.5, -7.2, FL + 1.15, sz, woodM, false);
+        cbox("clShelfTop", 4.6, 0.12, 0.5, -7.2, FL + 2.0, sz, woodM, false);
+        for (let i = 0; i < 5; i++) {
+          const bx = -9.1 + i * 0.95;
+          cbox("clTicketStack", 0.5, 0.34, 0.36, bx, FL + 1.38, sz, paperM, false);
+          if (i % 3 !== 1) cbox("clTicketStack2", 0.5, 0.3, 0.36, bx, FL + 2.21, sz, paperM, false);
+        }
+      }
+      cbox("clDesk", 2.2, 0.12, 1.1, -8.3, FL + 0.95, 0.6, woodM);
+      for (const [lx, lz] of [[-9.2, 0.2], [-7.4, 0.2], [-9.2, 1.0], [-7.4, 1.0]]) {
+        ccyl("clDeskLeg", 0.95, 0.1, lx, FL + 0.47, lz, woodM);
+      }
+      cbox("clLedger", 0.5, 0.08, 0.36, -8.5, FL + 1.05, 0.6, paperM, false);
+      for (let i = 0; i < 14; i++) { // spilled tickets on the floor
+        const t = cbox("clSpill", 0.24, 0.02, 0.16,
+          -9.6 + Math.random() * 4.6, FL + 0.02, -3 + Math.random() * 9, paperM, false);
+        t.rotation.y = Math.random() * Math.PI;
+      }
+
+      // ---- ROOM 3: spirit cells (barred cages + a trapped ghost) ----
+      for (const cell of [[1.9, 4.4], [4.6, 7.1]]) {
+        const [x1, x2] = cell;
+        const bars = Math.round((x2 - x1) / 0.42);
+        for (let i = 0; i <= bars; i++) {
+          ccyl("clCellBar", CH2 - 0.2, 0.09, x1 + (i / bars) * (x2 - x1), FL + (CH2 - 0.2) / 2, 4.2, ironM, true);
+        }
+        cbox("clCellTop", x2 - x1, 0.14, 0.14, (x1 + x2) / 2, FL + CH2 - 0.2, 4.2, ironM, false);
+        cwall2("clCellSide", "x", x1, 4.2, 7.2);
+        cwall2("clCellSide", "x", x2, 4.2, 7.2);
+      }
+      for (const [hx, hz] of [[2.6, 5.6], [6.2, 6.1], [5.0, 1.4]]) { // hanging chains
+        ccyl("clChain", 1.7, 0.06, hx, CEIL - 0.85, hz, ironM);
+        ccyl("clShackle", 0.18, 0.3, hx, CEIL - 1.75, hz, ironM);
+      }
+      // the prisoner
+      const cellGhost = BABYLON.MeshBuilder.CreateCylinder("clCellGhost", {
+        height: 1.9, diameterTop: 0.22, diameterBottom: 1.15, tessellation: 10,
+      }, scene);
+      const cellGhostM = new BABYLON.StandardMaterial("clCellGhostM", scene);
+      cellGhostM.diffuseColor = C3(0.8, 0.86, 0.95);
+      cellGhostM.emissiveColor = C3(0.28, 0.36, 0.48);
+      cellGhostM.alpha = 0.66;
+      cellGhostM.disableLighting = true;
+      cellGhost.material = cellGhostM;
+      cellGhost.isPickable = false;
+      for (const ex of [-0.15, 0.15]) {
+        const e = BABYLON.MeshBuilder.CreateSphere("clGhostEye", { diameter: 0.1, segments: 5 }, scene);
+        e.position.set(ex, 0.5, -0.4);
+        e.material = mat(scene, "clGhostEyeM", C3(0.01, 0.01, 0.01));
+        e.parent = cellGhost;
+        e.isPickable = false;
+      }
+      PARK.updaters.push((dt, t) => {
+        cellGhost.position.set(cx + 3.15, FL + 1.2 + Math.sin(t * 1.3) * 0.18, cz + 5.8 + Math.sin(t * 0.4) * 0.6);
+        cellGhost.rotation.y = Math.sin(t * 0.3) * 0.5; // faces the bars
+      });
+
+      // ---- ROOM 2: machine room (boiler, gears, pipes) ----
+      const boiler = ccyl("clBoiler", 2.9, 2.2, -3.4, FL + 1.45, 5.2, ironM, true);
+      const fireM = new BABYLON.StandardMaterial("clFireM", scene);
+      fireM.emissiveColor = C3(1, 0.4, 0.06);
+      fireM.diffuseColor = C3(0.2, 0.06, 0.01);
+      fireM.disableLighting = true;
+      registerFlicker(fireM, C3(1, 0.4, 0.06), "buzz");
+      const hatch = BABYLON.MeshBuilder.CreatePlane("clHatch", { width: 0.9, height: 0.7 }, scene);
+      hatch.position.set(cx - 3.4, FL + 1.1, cz + 4.06);
+      hatch.material = fireM;
+      hatch.isPickable = false;
+      hatch.freezeWorldMatrix();
+      for (const [gx, gz, gd] of [[0.3, 6.2, 1.8], [-1.1, 4.9, 1.1], [0.9, 3.9, 0.9]]) {
+        const gear = BABYLON.MeshBuilder.CreateTorus("clGear", { diameter: gd, thickness: 0.16, tessellation: 12 }, scene);
+        gear.position.set(cx + gx, FL + 1.5, cz + gz);
+        gear.material = brassM;
+        gear.isPickable = false;
+        gear.metadata = { animated: true };
+        cellar.push(gear);
+        const seed = gx;
+        PARK.updaters.push((dt, t) => { gear.rotation.z = t * (0.4 + Math.abs(seed) * 0.05); });
+        for (let i = 0; i < 8; i++) {
+          const a = (i / 8) * Math.PI * 2;
+          const tooth = cbox("clTooth", 0.16, 0.16, 0.16,
+            gx + Math.cos(a) * gd / 2, FL + 1.5 + Math.sin(a) * gd / 2, gz, brassM, false);
+        }
+      }
+      for (const pz2 of [2.6, 0.4]) {
+        ccyl("clPipe2", 5, 0.22, -1.5, CEIL - 0.45, pz2, brassM).rotation.z = Math.PI / 2;
+      }
+      ccyl("clValve", 0.12, 0.9, -4.2, FL + 2.2, 1.2, ironM).rotation.x = Math.PI / 2;
+
+      // ---- ROOM 4: the ritual altar (a ghost ticket always rests here) ----
+      cbox("clAltarBase", 2.6, 0.4, 1.8, 10.7, FL + 0.2, 4.5, wallM);
+      cbox("clAltarMid", 2.0, 0.4, 1.4, 10.7, FL + 0.6, 4.5, wallM);
+      cbox("clAltarTop", 2.4, 0.3, 1.6, 10.7, FL + 0.95, 4.5, boneM);
+      const circle = BABYLON.MeshBuilder.CreateDisc("clCircle", { radius: 2.6, tessellation: 40 }, scene);
+      circle.rotation.x = Math.PI / 2;
+      circle.position.set(cx + 10.7, FL + 0.03, cz + 4.5);
+      const circleM = new BABYLON.StandardMaterial("clCircleM", scene);
+      circleM.emissiveColor = C3(0.55, 0.05, 0.04);
+      circleM.alpha = 0.5;
+      circleM.disableLighting = true;
+      registerFlicker(circleM, C3(0.55, 0.05, 0.04), "pulse");
+      circle.material = circleM;
+      circle.isPickable = false;
+      circle.freezeWorldMatrix();
+      const ringOuter = BABYLON.MeshBuilder.CreateTorus("clCircleRing", { diameter: 5.2, thickness: 0.09, tessellation: 40 }, scene);
+      ringOuter.position.set(cx + 10.7, FL + 0.06, cz + 4.5);
+      ringOuter.material = circleM;
+      ringOuter.isPickable = false;
+      ringOuter.freezeWorldMatrix();
+      for (let i = 0; i < 6; i++) {
+        const a = (i / 6) * Math.PI * 2;
+        const candleX = 10.7 + Math.cos(a) * 2.3, candleZ = 4.5 + Math.sin(a) * 2.3;
+        ccyl("clCandle", 0.5, 0.16, candleX, FL + 0.25, candleZ, boneM);
+        lantern(candleX, FL + 0.62, candleZ);
+      }
+      for (const [sx2, sz2] of [[9.2, 2.4], [12.3, 2.7], [13.1, 5.6]]) {
+        const skull = BABYLON.MeshBuilder.CreateSphere("clSkull", { diameter: 0.34, segments: 8 }, scene);
+        skull.position.set(cx + sx2, FL + 0.18, cz + sz2);
+        skull.scaling.set(0.85, 1, 1.1);
+        skull.material = boneM;
+        skull.isPickable = false;
+        skull.freezeWorldMatrix();
+        cellar.push(skull);
+      }
+
+      for (const m of cellar) {
+        if (!m.metadata || !m.metadata.animated) m.freezeWorldMatrix();
+      }
+
+      // ---- cellar lighting: only these lamps reach down here ----
+      function cellarLight(name, x, y, z, color, intensity, range, anim) {
+        const l = new BABYLON.PointLight(name, new BABYLON.Vector3(cx + x, y, cz + z), scene);
+        l.diffuse = color;
+        l.intensity = intensity;
+        l.range = range;
+        l.includedOnlyMeshes = cellar;
+        if (anim) PARK.updaters.push((dt, t) => { l.intensity = anim(t); });
+        return l;
+      }
+      // the stairs need their own light at every level, or the descent is a
+      // black hole from the hall (the cellar is cut off from moon and sky)
+      cellarLight("clLightStairTop", OPEN.x1 + 0.5, 2.6, OPEN.z2 - 0.6, C3(1, 0.62, 0.25), 1.7, 15);
+      cellarLight("clLightStairMid", OPEN.x1 + 0.5, -0.6, 1.6, C3(1, 0.58, 0.22), 1.5, 14);
+      cellarLight("clLightStair", -12, FL + 2.8, -5.2, C3(1, 0.6, 0.25), 1.6, 16);
+      cellarLight("clLightCorrW", -4, FL + 3.2, -5.5, C3(0.5, 0.85, 0.6), 1.2, 20,
+        () => (Math.random() < 0.03 ? 0.15 : 1.2));
+      cellarLight("clLightCorrE", 9, FL + 3.2, -5.5, C3(0.5, 0.85, 0.6), 1.1, 20);
+      cellarLight("clLightStore", -7.2, FL + 3, 1.5, C3(0.95, 0.72, 0.35), 1.1, 16);
+      cellarLight("clLightCells", 4.5, FL + 3, 4, C3(0.35, 0.6, 1.0), 1.4, 16);
+      cellarLight("clLightAltar", 10.7, FL + 2.2, 4.5, C3(1, 0.16, 0.1), 1.7, 16,
+        (t) => 1.2 + 0.6 * Math.sin(t * 1.7));
+      cellarLight("clLightBoiler", -3.4, FL + 1.3, 4.3, C3(1, 0.45, 0.1), 1.2, 12,
+        (t) => 0.9 + 0.5 * Math.abs(Math.sin(t * 5.3)));
+
+      // keep sun/sky out of the cellar so it stays pitch dark
+      if (PARK.hemiLight) PARK.hemiLight.excludedMeshes.push(...cellar);
+      if (PARK.moonLight) PARK.moonLight.excludedMeshes.push(...cellar);
+    }
+
     // keep tower on the roof + corner towers + battlements
     const keep = BABYLON.MeshBuilder.CreateBox("caKeep", { width: 11, height: 12, depth: 11 }, scene);
     keep.position.set(cx, H + 6.3, cz);
@@ -207,7 +564,21 @@ function buildLandmarks(scene) {
       const tw = BABYLON.MeshBuilder.CreateCylinder("caTower", { height: 19, diameter: 6.5, tessellation: 10 }, scene);
       tw.position.set(cx + tx2, 9.5, cz + tz2);
       tw.material = stoneMat;
-      tw.checkCollisions = true;
+      // The towers overlap the hall corners, so a cylinder collider would wall
+      // off the inside (it used to block the cellar stairs). Collision lives on
+      // invisible slabs over the parts that stick out past the hall shell.
+      tw.checkCollisions = false;
+      const sx2 = Math.sign(tx2), sz2 = Math.sign(tz2);
+      const outX = BABYLON.MeshBuilder.CreateBox("caTowerHitX", { width: 2.4, height: 19, depth: 6.5 }, scene);
+      outX.position.set(cx + tx2 + sx2 * 2.05, 9.5, cz + tz2);
+      const outZ = BABYLON.MeshBuilder.CreateBox("caTowerHitZ", { width: 6.5, height: 19, depth: 2.4 }, scene);
+      outZ.position.set(cx + tx2, 9.5, cz + tz2 + sz2 * 2.05);
+      for (const hit of [outX, outZ]) {
+        hit.isVisible = false;
+        hit.isPickable = false;
+        hit.checkCollisions = true;
+        hit.freezeWorldMatrix();
+      }
       PARK.colliders.push(tw);
       tw.freezeWorldMatrix();
       castleMeshes.push(tw);

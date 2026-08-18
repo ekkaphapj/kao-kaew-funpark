@@ -11,6 +11,7 @@ const PARK = {
   updaters: [],   // fn(dt, t)
   colliders: [],  // meshes that block the third-person camera
   indoorZones: [], // safe building interiors used by the monster system
+  lowZones: [],   // areas you can descend into (basements): {x,z,w,d,minY}
   mats: {},
   bounds: 110,    // half size of the park (220x220 m)
   isMobile: false,
@@ -29,6 +30,19 @@ function isInsideParkBuilding(pos, padding) {
     if (Math.abs(lx) < zone.w / 2 - pad && Math.abs(lz) < zone.d / 2 - pad) return true;
   }
   return false;
+}
+
+// Lowest capsule-centre height allowed at this spot. The park is flat, so the
+// player is normally held at 0.95 by this clamp rather than by ground collision
+// — basements register a low zone here so you can walk down into them.
+function groundLimitAt(x, z) {
+  let limit = 0.95;
+  for (const zone of PARK.lowZones) {
+    if (Math.abs(x - zone.x) < zone.w / 2 && Math.abs(z - zone.z) < zone.d / 2) {
+      limit = Math.min(limit, zone.minY);
+    }
+  }
+  return limit;
 }
 
 function registerFlicker(mat, baseColor, mode) {
@@ -87,6 +101,7 @@ function buildEnvironment(scene) {
   moonLight.diffuse = C3(0.55, 0.62, 0.85);
   moonLight.specular = C3(0.25, 0.3, 0.45);
   PARK.moonLight = moonLight;
+  PARK.hemiLight = hemi;
 
   // ---------- Fog & sky ----------
   scene.clearColor = new BABYLON.Color4(0.012, 0.015, 0.045, 1);
@@ -133,7 +148,9 @@ function buildEnvironment(scene) {
     gMat.bumpTexture.level = 0.22;
   }
   ground.material = gMat;
-  ground.checkCollisions = true;
+  // No collision on the world plate: it would seal the castle basement shut.
+  // groundLimitAt() holds everyone up on this (perfectly flat) park instead.
+  ground.checkCollisions = false;
   ground.freezeWorldMatrix();
 
   // ---------- Streets (darker asphalt strips) ----------

@@ -396,7 +396,9 @@ function createPlayer(scene, canvas) {
     const vz = (iz * cos - ix * sin) * speed;
     const disp = new BABYLON.Vector3(vx * dt, -9.8 * dt * dt * 6 - 0.02, vz * dt);
     root.moveWithCollisions(disp);
-    if (root.position.y < 0.95) root.position.y = 0.95;
+    // floor clamp: 0.95 above the park, lower inside a basement
+    const floorLimit = groundLimitAt(root.position.x, root.position.z);
+    if (root.position.y < floorLimit) root.position.y = floorLimit;
 
     // face character toward movement direction
     const moving = ilen > 0.05;
@@ -452,7 +454,9 @@ function createPlayer(scene, canvas) {
         dist = Math.min(dist, hit.distance - 0.25);
       }
       camPos.copyFrom(camTarget).addInPlace(fwd.scale(-dist));
-      if (camPos.y < 0.4) camPos.y = 0.4;
+      // keep the camera above whichever floor the player is standing on
+      const camFloor = groundLimitAt(root.position.x, root.position.z) - 0.55;
+      if (camPos.y < camFloor) camPos.y = camFloor;
       camera.position.copyFrom(camPos);
       camera.setTarget(camTarget);
     }

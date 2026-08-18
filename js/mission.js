@@ -31,6 +31,8 @@ function createMission(scene, player, audio) {
     { p: [98, 1.4, 92.3], label: "หน้าสุสานหิน" },
     { p: [82, 1.2, 19], label: "ใต้ชิงช้าสวรรค์" },
     { p: [72, 1.4, -71.5], label: "ขอบสระสไลเดอร์" },
+    // always in play, so every round someone has to go down into the cellar
+    { p: [10.7, -3.5, 89.5], label: "แท่นบูชาใต้ปราสาท", always: true },
   ];
 
   // ---------- state ----------
@@ -254,12 +256,13 @@ function createMission(scene, player, audio) {
     // host: choose spots, arbitrate phases, broadcast state
     if (ctx.isAuthority) {
       if (!spotIdx) {
-        const all = SPOTS.map((s, i) => i);
-        for (let i = all.length - 1; i > 0; i--) {
+        const must = SPOTS.map((s, i) => i).filter(i => SPOTS[i].always);
+        const pool = SPOTS.map((s, i) => i).filter(i => !SPOTS[i].always);
+        for (let i = pool.length - 1; i > 0; i--) {
           const j = Math.floor(Math.random() * (i + 1));
-          [all[i], all[j]] = [all[j], all[i]];
+          [pool[i], pool[j]] = [pool[j], pool[i]];
         }
-        applySpots(all.slice(0, REQUIRED).sort((a, b) => a - b));
+        applySpots(must.concat(pool.slice(0, REQUIRED - must.length)).sort((a, b) => a - b));
       }
       if (phase === 1 && taken.size >= REQUIRED) enterPhase(2);
       if (phase === 2 && deposited >= REQUIRED) enterPhase(3);
