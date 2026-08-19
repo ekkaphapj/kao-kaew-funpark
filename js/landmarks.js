@@ -228,6 +228,7 @@ function buildLandmarks(scene) {
       const woodM = mat(scene, "clWoodM", C3(0.36, 0.27, 0.17), { tex: TEX.planks(scene) });
       const stairM = mat(scene, "clStairM", C3(0.48, 0.38, 0.24), { tex: TEX.planks(scene) });
       stairM.diffuseTexture.uScale = 2.4; stairM.diffuseTexture.vScale = 1.2;
+      stairM.emissiveColor = C3(0.07, 0.045, 0.018);
       const ironM = mat(scene, "clIronM", C3(0.17, 0.17, 0.2));
       const brassM = mat(scene, "clBrassM", C3(0.44, 0.33, 0.13));
       const trimM = mat(scene, "clTrimM", C3(0.4, 0.37, 0.43), { tex: TEX.brick(scene, "dark") });
@@ -328,22 +329,24 @@ function buildLandmarks(scene) {
       ramp.rotation.x = -ang;                   // +Z end sits high
       ramp.material = wallM;
       ramp.checkCollisions = true;
+      ramp.isVisible = false;                   // collision only; never cover the real steps
       ramp.isPickable = false;
       ramp.freezeWorldMatrix();
       cellar.push(ramp);
       const STEPS = 17, run = RUN / STEPS, rise = DROP / STEPS;
       for (let i = 0; i < STEPS; i++) {
-        // Each riser reaches exactly to the next tread. The old overlapping
-        // boxes started below the hall floor and read as an empty black shaft.
+        // Solid masonry blocks hide the collision ramp and give the staircase
+        // a clear stepped silhouette from every camera angle.
         const topY = 0.09 - i * rise;
-        cbox("clStepRiser" + i, 3.28, rise, run, shaftX,
-          topY - rise / 2, OPEN.z2 - (i + 0.5) * run, wallM, false);
-        cbox("clStepTread" + i, 3.18, 0.055, run * 0.94, shaftX,
-          topY + 0.018, OPEN.z2 - (i + 0.5) * run, stairM, false);
+        const blockH = topY - FL;
+        cbox("clStepBlock" + i, 3.28, blockH, run, shaftX,
+          FL + blockH / 2, OPEN.z2 - (i + 0.5) * run, wallM, false);
+        cbox("clStepTread" + i, 3.14, 0.07, run * 0.9, shaftX,
+          topY + 0.035, OPEN.z2 - (i + 0.5) * run, stairM, false);
         // Thin brass nosing catches the lantern light and makes every step legible.
         if (!PARK.lowQuality) {
-          cbox("clStepEdge" + i, 3.2, 0.06, 0.07, shaftX,
-            topY + 0.03, OPEN.z2 - i * run - 0.04, brassM, false);
+          cbox("clStepEdge" + i, 3.18, 0.075, 0.065, shaftX,
+            topY + 0.04, OPEN.z2 - (i + 1) * run + 0.035, brassM, false);
         }
       }
       // Railing follows the descent. Previously every post sat at hall height,
@@ -352,19 +355,18 @@ function buildLandmarks(scene) {
         const f = i / 8;
         const rz = OPEN.z2 - f * RUN;
         const floorY = 0.09 - f * DROP;
-        ccyl("clRailPost", 1.05, 0.1, OPEN.x2 + 0.05, floorY + 0.53, rz, ironM);
+        ccyl("clRailPost", 1.0, 0.075, OPEN.x2 + 0.05, floorY + 0.5, rz, ironM);
       }
       const rail = BABYLON.MeshBuilder.CreateTube("clRail", {
         path: [
           new BABYLON.Vector3(cx + OPEN.x2 + 0.05, 1.1, cz + OPEN.z2),
           new BABYLON.Vector3(cx + OPEN.x2 + 0.05, FL + 1.03, cz + OPEN.z1),
         ],
-        radius: 0.065, tessellation: 7,
+        radius: 0.045, tessellation: 7,
       }, scene);
       rail.material = ironM;
       rail.isPickable = false;
       cellar.push(rail);
-      cbox("clRailEnd", OPEN.x2 - OPEN.x1, 1.1, 0.12, shaftX, 0.64, OPEN.z1 - 0.05, ironM);
 
       // A proper landing and stone portal announce the stairs from the hall.
       cbox("clLanding", 3.4, 0.12, 1.05, shaftX, 0.055, OPEN.z2 + 0.48, stairM, false);
