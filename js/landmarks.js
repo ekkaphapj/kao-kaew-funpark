@@ -221,13 +221,16 @@ function buildLandmarks(scene) {
       // let the player descend anywhere under the castle footprint
       PARK.lowZones.push({ x: cx, z: cz, w: 29.4, d: 15.4, minY: FL + 0.95 });
 
-      const wallM = mat(scene, "clWallM", C3(0.27, 0.25, 0.31), { tex: TEX.brick(scene, "dark") });
+      const wallM = mat(scene, "clWallM", C3(0.31, 0.29, 0.34), { tex: TEX.brick(scene, "dark") });
       wallM.diffuseTexture.uScale = 6; wallM.diffuseTexture.vScale = 2;
-      const floorM = mat(scene, "clFloorM", C3(0.31, 0.3, 0.32), { tex: TEX.pavement(scene) });
+      const floorM = mat(scene, "clFloorM", C3(0.36, 0.35, 0.37), { tex: TEX.pavement(scene) });
       floorM.diffuseTexture.uScale = 14; floorM.diffuseTexture.vScale = 7;
       const woodM = mat(scene, "clWoodM", C3(0.36, 0.27, 0.17), { tex: TEX.planks(scene) });
+      const stairM = mat(scene, "clStairM", C3(0.48, 0.38, 0.24), { tex: TEX.planks(scene) });
+      stairM.diffuseTexture.uScale = 2.4; stairM.diffuseTexture.vScale = 1.2;
       const ironM = mat(scene, "clIronM", C3(0.17, 0.17, 0.2));
       const brassM = mat(scene, "clBrassM", C3(0.44, 0.33, 0.13));
+      const trimM = mat(scene, "clTrimM", C3(0.4, 0.37, 0.43), { tex: TEX.brick(scene, "dark") });
       const paperM = mat(scene, "clPaperM", C3(0.56, 0.48, 0.31));
       const boneM = mat(scene, "clBoneM", C3(0.72, 0.7, 0.62));
 
@@ -292,6 +295,20 @@ function buildLandmarks(scene) {
         [[-8.4, -6], [-2.7, -0.3], [3.3, 5.7], [9.5, 11.9]]);
       for (const dx of [-4.5, 1.5, 7.5]) cwall2("clRoomDiv", "x", dx, -4, 7.2);
 
+      // Heavy stone ribs and doorway surrounds break up the long, boxy shell.
+      // They also make every room readable from the corridor at a glance.
+      for (const bx of [-9.7, -4.5, 1.5, 7.5, 13.8]) {
+        cbox("clCeilRib", 0.28, 0.28, 3.0, bx, CEIL - 0.14, -5.55, trimM, false);
+        cbox("clRibFoot", 0.34, CH2 - 0.28, 0.34, bx, FL + (CH2 - 0.28) / 2, -6.88, trimM, false);
+        cbox("clRibFoot", 0.34, CH2 - 0.28, 0.34, bx, FL + (CH2 - 0.28) / 2, -4.18, trimM, false);
+      }
+      const roomDoors = [[-8.4, -6], [-2.7, -0.3], [3.3, 5.7], [9.5, 11.9]];
+      for (const [x1, x2] of roomDoors) {
+        cbox("clDoorTrim", 0.22, 2.55, 0.56, x1, FL + 1.275, -4, trimM, false);
+        cbox("clDoorTrim", 0.22, 2.55, 0.56, x2, FL + 1.275, -4, trimM, false);
+        cbox("clDoorLintel", x2 - x1 + 0.22, 0.24, 0.58, (x1 + x2) / 2, FL + 2.52, -4, trimM, false);
+      }
+
       // ---- shaft walls between hall floor and cellar ceiling ----
       const shaftH = 0.09 - CEIL + 0.4;
       const shaftY = CEIL + shaftH / 2 - 0.2;
@@ -299,7 +316,7 @@ function buildLandmarks(scene) {
       cbox("clShaftE", WT, shaftH, OPEN.z2 - OPEN.z1, OPEN.x2 + 0.1, shaftY, (OPEN.z1 + OPEN.z2) / 2, wallM);
       cbox("clShaftS", OPEN.x2 - OPEN.x1, shaftH, WT, (OPEN.x1 + OPEN.x2) / 2, shaftY, OPEN.z1 - 0.1, wallM);
 
-      // ---- the staircase: a smooth collision ramp + decorative steps ----
+      // ---- the staircase: a smooth collision ramp + full visible steps ----
       const RUN = OPEN.z2 - OPEN.z1;            // 10 m horizontal
       const DROP = 0.09 - FL;                   // 5.09 m vertical
       const ang = Math.atan2(DROP, RUN);
@@ -316,18 +333,44 @@ function buildLandmarks(scene) {
       cellar.push(ramp);
       const STEPS = 17, run = RUN / STEPS, rise = DROP / STEPS;
       for (let i = 0; i < STEPS; i++) {
-        // steps are visual only — the ramp underneath carries the player
-        cbox("clStep" + i, 3.4, 0.62, run, shaftX,
-          0.09 - (i + 1) * rise - 0.31, OPEN.z2 - (i + 0.5) * run, wallM, false);
+        // Each riser reaches exactly to the next tread. The old overlapping
+        // boxes started below the hall floor and read as an empty black shaft.
+        const topY = 0.09 - i * rise;
+        cbox("clStepRiser" + i, 3.28, rise, run, shaftX,
+          topY - rise / 2, OPEN.z2 - (i + 0.5) * run, wallM, false);
+        cbox("clStepTread" + i, 3.18, 0.055, run * 0.94, shaftX,
+          topY + 0.018, OPEN.z2 - (i + 0.5) * run, stairM, false);
+        // Thin brass nosing catches the lantern light and makes every step legible.
+        if (!PARK.lowQuality) {
+          cbox("clStepEdge" + i, 3.2, 0.06, 0.07, shaftX,
+            topY + 0.03, OPEN.z2 - i * run - 0.04, brassM, false);
+        }
       }
-      // railing along the open side, so nobody trips in by accident
+      // Railing follows the descent. Previously every post sat at hall height,
+      // leaving most of the stairwell with no visible rail at all.
       for (let i = 0; i <= 8; i++) {
-        const rz = OPEN.z1 + (i / 8) * RUN;
-        ccyl("clRailPost", 1.0, 0.09, OPEN.x2 + 0.05, 0.6, rz, ironM);
+        const f = i / 8;
+        const rz = OPEN.z2 - f * RUN;
+        const floorY = 0.09 - f * DROP;
+        ccyl("clRailPost", 1.05, 0.1, OPEN.x2 + 0.05, floorY + 0.53, rz, ironM);
       }
-      const rail = cbox("clRail", 0.1, 0.1, RUN, OPEN.x2 + 0.05, 1.05, (OPEN.z1 + OPEN.z2) / 2, ironM);
-      rail.checkCollisions = true;
+      const rail = BABYLON.MeshBuilder.CreateTube("clRail", {
+        path: [
+          new BABYLON.Vector3(cx + OPEN.x2 + 0.05, 1.1, cz + OPEN.z2),
+          new BABYLON.Vector3(cx + OPEN.x2 + 0.05, FL + 1.03, cz + OPEN.z1),
+        ],
+        radius: 0.065, tessellation: 7,
+      }, scene);
+      rail.material = ironM;
+      rail.isPickable = false;
+      cellar.push(rail);
       cbox("clRailEnd", OPEN.x2 - OPEN.x1, 1.1, 0.12, shaftX, 0.64, OPEN.z1 - 0.05, ironM);
+
+      // A proper landing and stone portal announce the stairs from the hall.
+      cbox("clLanding", 3.4, 0.12, 1.05, shaftX, 0.055, OPEN.z2 + 0.48, stairM, false);
+      cbox("clPortalL", 0.34, 2.75, 0.5, OPEN.x1 - 0.05, 1.38, OPEN.z2 + 0.18, trimM, false);
+      cbox("clPortalR", 0.34, 2.75, 0.5, OPEN.x2 + 0.05, 1.38, OPEN.z2 + 0.18, trimM, false);
+      cbox("clPortalTop", OPEN.x2 - OPEN.x1 + 0.45, 0.36, 0.52, shaftX, 2.72, OPEN.z2 + 0.18, trimM, false);
 
       // ---- entrance sign + lantern at the top of the stairs ----
       const signTex = TEX.sign(scene, "ห้องใต้ดิน · ห้ามลง", {
@@ -340,7 +383,7 @@ function buildLandmarks(scene) {
       signM.disableLighting = true;
       registerFlicker(signM, C3(1, 1, 1), "dying");
       const sign = BABYLON.MeshBuilder.CreatePlane("clSign", { width: 3.4, height: 0.6 }, scene);
-      sign.position.set(cx + shaftX, 2.4, cz + OPEN.z2 + 0.1);
+      sign.position.set(cx + shaftX, 2.4, cz + OPEN.z2 - 0.13);
       sign.rotation.y = Math.PI;
       sign.material = signM;
       sign.isPickable = false;
@@ -361,8 +404,48 @@ function buildLandmarks(scene) {
       }
       // lanterns hug the shaft wall above head height, never the walking line
       lantern(OPEN.x1 + 0.3, 2.9, OPEN.z2 - 0.4);
-      lantern(OPEN.x1 + 0.3, -0.4, 1.6);
+      lantern(OPEN.x1 + 0.3, -0.55, 1.6);
       lantern(-11, FL + 2.9, -5.4);
+
+      // Wall sconces give the corridor a deliberate rhythm instead of a flat wash.
+      for (const [lx, lz] of [[-5.4, -4.22], [0.3, -4.22], [6.5, -4.22], [12.8, -4.22]]) {
+        cbox("clSconceArm", 0.08, 0.08, 0.5, lx, FL + 2.45, lz, ironM, false);
+        lantern(lx, FL + 2.5, lz - 0.28);
+      }
+
+      // Uneven stepping stones and a drain add age without blocking movement.
+      for (let i = 0; i < 11; i++) {
+        const slab = cbox("clPathSlab", 1.35 + (i % 3) * 0.12, 0.06, 1.0,
+          -7.2 + i * 1.85, FL + 0.035, -5.48 + Math.sin(i * 2.1) * 0.12, trimM, false);
+        slab.rotation.y = (i % 2 ? 1 : -1) * 0.035;
+      }
+      const drain = ccyl("clDrain", 0.04, 0.9, 7.3, FL + 0.055, -6.25, ironM);
+      for (let i = 0; i < 4; i++) {
+        cbox("clDrainSlot", 0.58, 0.025, 0.055, 7.3, FL + 0.085, -6.48 + i * 0.16, brassM, false);
+      }
+
+      // Small aged plaques turn the four similar openings into distinct rooms.
+      const roomNames = [
+        [-7.2, "ห้องเก็บตั๋ว", "#c8a76a"],
+        [-1.5, "ห้องเครื่อง", "#e28a45"],
+        [4.5, "ห้องคุมขัง", "#79a9d8"],
+        [10.7, "ห้องพิธี", "#d65a55"],
+      ];
+      for (const [sx, label, fg] of roomNames) {
+        const plaqueTex = TEX.sign(scene, label, {
+          w: 512, h: 96, bg: "#100d12", fg, glowColor: fg, fontSize: 52,
+        });
+        const plaqueM = new BABYLON.StandardMaterial("clPlaqueM", scene);
+        plaqueM.diffuseTexture = plaqueTex;
+        plaqueM.emissiveTexture = plaqueTex;
+        plaqueM.emissiveColor = C3(0.45, 0.45, 0.45);
+        plaqueM.disableLighting = true;
+        const plaque = BABYLON.MeshBuilder.CreatePlane("clPlaque", { width: 1.9, height: 0.42 }, scene);
+        plaque.position.set(cx + sx, FL + 3.12, cz - 4.23);
+        plaque.material = plaqueM;
+        plaque.isPickable = false;
+        plaque.freezeWorldMatrix();
+      }
 
       // ---- STAIR HALL (west): barrels and crates by the landing ----
       for (const [bx, bz] of [[-13.2, -6.4], [-12.1, -6.6], [-13.4, -5.1]]) {
@@ -472,8 +555,11 @@ function buildLandmarks(scene) {
         PARK.updaters.push((dt, t) => { gear.rotation.z = t * (0.4 + Math.abs(seed) * 0.05); });
         for (let i = 0; i < 8; i++) {
           const a = (i / 8) * Math.PI * 2;
-          const tooth = cbox("clTooth", 0.16, 0.16, 0.16,
-            gx + Math.cos(a) * gd / 2, FL + 1.5 + Math.sin(a) * gd / 2, gz, brassM, false);
+          const tooth = cbox("clTooth", 0.16, 0.16, 0.16, 0, 0, 0, brassM, false);
+          tooth.parent = gear;
+          tooth.position.set(Math.cos(a) * gd / 2, Math.sin(a) * gd / 2, 0);
+          tooth.rotation.z = a;
+          tooth.metadata = { animated: true };
         }
       }
       for (const pz2 of [2.6, 0.4]) {
